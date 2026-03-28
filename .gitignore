@@ -15,10 +15,9 @@ models/
 node_modules/
 web/frontend/dist/
 
-# Env files (may contain real URLs/secrets in production)
+# Env files (may contain secrets — keep out of git)
 .env.local
 .env.production.local
-web/frontend/.env.production
 
 # History file (runtime data, not source)
 web/backend/run_history.json

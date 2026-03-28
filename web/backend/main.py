@@ -29,13 +29,22 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 from src.game.ml_engine import MLGameEngine
-from src.game.dqn_agent_v2 import DQNAgentV2
 from web.backend.rpg_engine import RPGRun
+
+# DQNAgentV2 pulls in torch (~800 MB). Only import it if the model file
+# actually exists so Railway deploys stay lean.
+_MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "dqn_v2_best.pth"
+if _MODEL_PATH.exists():
+    from src.game.dqn_agent_v2 import DQNAgentV2
+else:
+    DQNAgentV2 = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Run history — persisted to JSON so it survives server restarts
@@ -83,14 +92,13 @@ ai_agent: Optional[DQNAgentV2] = None
 @app.on_event("startup")
 async def startup():
     global ai_agent
-    model_path = Path(__file__).parent.parent.parent / "models" / "dqn_v2_best.pth"
-    if model_path.exists():
+    if DQNAgentV2 is not None and _MODEL_PATH.exists():
         ai_agent = DQNAgentV2()
-        ai_agent.load(str(model_path))
+        ai_agent.load(str(_MODEL_PATH))
         ai_agent.epsilon = 0.0
-        logger.info(f"AI model loaded from {model_path}")
+        logger.info(f"AI model loaded from {_MODEL_PATH}")
     else:
-        logger.warning(f"No model at {model_path}. /ai-hint will return empty.")
+        logger.info("No AI model found — /ai-hint will return empty.")
     asyncio.create_task(_cleanup_loop())
 
 # ---------------------------------------------------------------------------
@@ -486,3 +494,29 @@ def ai_hint(session_id: str):
         "best_number": rankings[0]["number"],
         "rankings": rankings,
     }
+
+
+# ---------------------------------------------------------------------------
+# Health check (used by Railway)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Serve built React frontend (production)
+# Mounted last so all /api routes take priority.
+# ---------------------------------------------------------------------------
+
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.exists():
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST / "assets"), name="assets")
+
+    # Catch-all: serve index.html for any unmatched route (SPA client-side routing)
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        return FileResponse(_FRONTEND_DIST / "index.html")
