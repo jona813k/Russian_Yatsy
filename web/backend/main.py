@@ -35,14 +35,21 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-from src.game.ml_engine import MLGameEngine
 from web.backend.rpg_engine import RPGRun
 
-# DQNAgentV2 pulls in torch (~800 MB). Only import it if the model file
-# actually exists so Railway deploys stay lean.
+# MLGameEngine and DQNAgentV2 are only available locally (require src/ and models/).
+# Skip gracefully on Railway where neither exists.
+try:
+    from src.game.ml_engine import MLGameEngine
+except ImportError:
+    MLGameEngine = None  # type: ignore
+
 _MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "dqn_v2_best.pth"
 if _MODEL_PATH.exists():
-    from src.game.dqn_agent_v2 import DQNAgentV2
+    try:
+        from src.game.dqn_agent_v2 import DQNAgentV2
+    except ImportError:
+        DQNAgentV2 = None  # type: ignore
 else:
     DQNAgentV2 = None  # type: ignore
 
