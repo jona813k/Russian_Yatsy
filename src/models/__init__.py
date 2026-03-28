@@ -1,0 +1,3 @@
+"""
+Game models module
+"""
