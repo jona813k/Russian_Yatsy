@@ -1,12 +1,11 @@
-# nixpacks auto-detects Python from requirements.txt at root and sets up pip.
-# We only need to add Node for the frontend build.
-
 [phases.setup]
 nixPkgs = ["nodejs_20"]
+aptPkgs = ["python3", "python3-pip", "python3-venv"]
 
 [phases.install]
 cmds = [
-  "pip install -r requirements.txt",
+  "python3 -m venv /opt/venv",
+  "/opt/venv/bin/pip install -r requirements.txt",
   "cd web/frontend && npm install"
 ]
 
@@ -14,4 +13,4 @@ cmds = [
 cmds = ["cd web/frontend && npm run build"]
 
 [start]
-cmd = "uvicorn web.backend.main:app --host 0.0.0.0 --port $PORT"
+cmd = "/opt/venv/bin/uvicorn web.backend.main:app --host 0.0.0.0 --port $PORT"
