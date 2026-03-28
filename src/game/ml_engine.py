@@ -1,8 +1,12 @@
 """
 ML Training Engine - Enforces game rules for ML agent training
 """
-from src.models.game_state import GameState
-from src.models.player import Player
+try:
+    from src.models.game_state import GameState
+    from src.models.player import Player
+except ImportError:
+    GameState = None  # type: ignore
+    Player = None  # type: ignore
 from src.game.rules import GameRules
 from src.utils.helpers import roll_dice
 import random
@@ -16,6 +20,10 @@ class MLGameEngine:
     """
     
     def __init__(self, num_dice: int = None, roll_fn=None):
+        if GameState is None or Player is None:
+            raise ImportError(
+                "MLGameEngine requires src.models.game_state and src.models.player"
+            )
         self._num_dice = num_dice if num_dice is not None else GameRules.NUM_DICE
         self._roll_fn = roll_fn if roll_fn is not None else roll_dice
         self.state = GameState()
