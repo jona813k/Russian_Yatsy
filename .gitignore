@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pth
+*.pkl
+*.egg-info/
+.venv/
+venv/
+dist/
+
+# Models (large binary files — don't commit trained weights)
+models/
+
+# Node
+node_modules/
+web/frontend/dist/
+
+# Env files (may contain real URLs/secrets in production)
+.env.local
+.env.production.local
+web/frontend/.env.production
+
+# History file (runtime data, not source)
+web/backend/run_history.json
+
+# OS
+.DS_Store
+Thumbs.db

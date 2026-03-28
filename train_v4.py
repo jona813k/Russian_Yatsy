@@ -1,0 +1,272 @@
+"""
+Training script for DQN Agent v4 — targeting ≤25 median turns.
+
+Usage:
+    python train_v4.py                        # 300,000 episodes (default)
+    python train_v4.py --episodes 500000      # longer run
+    python train_v4.py --resume               # continue from last checkpoint
+    python train_v4.py --eval-only            # benchmark existing model
+    python train_v4.py --batch 512            # larger batch for GPU
+
+Key changes vs train_v3.py:
+  - Uses DQNAgentV4 (PER + 3-step returns, τ=0.005, LR=0.0001)
+  - 3 replays/episode instead of 5 — fewer target-net soft updates per episode
+  - flush_nstep() called after every episode for clean n-step buffer handling
+  - Reward shaping unchanged from v3 (quadratic win bonus + -30 turn penalty)
+
+Models saved to: models/dqn_v4.pth
+Best model:      models/dqn_v4_best.pth
+"""
+
+import sys
+sys.path.insert(0, 'src')
+
+import argparse
+import time
+import numpy as np
+from pathlib import Path
+
+from src.game.dqn_agent_v4 import DQNAgentV4
+from src.game.ml_engine import MLGameEngine
+
+
+# ---------------------------------------------------------------------------
+# Reward shaping (same as v3)
+# ---------------------------------------------------------------------------
+
+def shape_reward(result: dict, turn_number: int) -> float:
+    """
+    Quadratic win-efficiency bonus + strong turn-end penalty.
+
+    win bonus : (100 - turn)^2 * 2   →  2,800-pt gap between turn-25 and turn-35
+    turn penalty : engine -2  +  extra -28  =  total -30 per failed turn
+    """
+    reward = result['reward']
+    state  = result['state']
+
+    if state == 'won':
+        old_bonus = max(0, (100 - turn_number) * 5)
+        new_bonus = max(0, (100 - turn_number) ** 2 * 2)
+        reward = reward - old_bonus + new_bonus
+
+    elif state == 'turn_end':
+        reward -= 28
+
+    return reward
+
+
+# ---------------------------------------------------------------------------
+# Episode runner
+# ---------------------------------------------------------------------------
+
+def play_episode(agent: DQNAgentV4, engine: MLGameEngine, training: bool) -> dict:
+    """Play one complete game. Returns {'turns', 'won', 'reward'}."""
+    engine.reset()
+
+    total_reward = 0.0
+    steps = 0
+    max_steps = 2000
+
+    while not engine.is_game_over() and steps < max_steps:
+        rich_state    = engine.get_rich_state()
+        legal_actions = engine.get_legal_actions()
+
+        if not legal_actions:
+            break
+
+        action = agent.get_action(rich_state, legal_actions, training=training)
+        result = engine.execute_action(action)
+
+        reward = shape_reward(result, engine.turn_number)
+        total_reward += reward
+        done = result['state'] == 'won'
+
+        if training:
+            next_rich = engine.get_rich_state()
+            agent.remember(rich_state, action, reward, next_rich, done)
+
+        if done:
+            break
+
+        steps += 1
+
+    # Flush any remaining n-step buffer entries (handles max_steps exit)
+    if training:
+        agent.flush_nstep()
+
+    info = engine.get_game_info()
+    return {
+        'turns':  info['turns'],
+        'won':    info['is_won'],
+        'reward': total_reward,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Evaluation
+# ---------------------------------------------------------------------------
+
+def evaluate(agent: DQNAgentV4, engine: MLGameEngine, n_games: int = 200) -> dict:
+    """Run n_games greedy (ε=0) and return statistics."""
+    saved_epsilon = agent.epsilon
+    agent.epsilon = 0.0
+
+    turns_list = []
+    for _ in range(n_games):
+        result = play_episode(agent, engine, training=False)
+        turns_list.append(result['turns'])
+
+    agent.epsilon = saved_epsilon
+
+    turns = np.array(turns_list)
+    return {
+        'mean':   float(np.mean(turns)),
+        'median': float(np.median(turns)),
+        'std':    float(np.std(turns)),
+        'min':    int(np.min(turns)),
+        'max':    int(np.max(turns)),
+        'p10':    float(np.percentile(turns, 10)),
+        'p90':    float(np.percentile(turns, 90)),
+    }
+
+
+def print_eval(stats: dict, label: str = ''):
+    tag = f' ({label})' if label else ''
+    print(f"\n{'─'*60}")
+    print(f"  Evaluation{tag}")
+    print(f"{'─'*60}")
+    print(f"  Median turns : {stats['median']:.1f}")
+    print(f"  Mean turns   : {stats['mean']:.1f}")
+    print(f"  Std dev      : {stats['std']:.1f}")
+    print(f"  Best / Worst : {stats['min']} / {stats['max']}")
+    print(f"  P10 / P90    : {stats['p10']:.1f} / {stats['p90']:.1f}")
+    print(f"{'─'*60}\n")
+
+
+# ---------------------------------------------------------------------------
+# Main training loop
+# ---------------------------------------------------------------------------
+
+def train(episodes: int, resume: bool, model_path: str, best_path: str, batch_size: int):
+    agent = DQNAgentV4(
+        learning_rate   = 0.0001,
+        discount_factor = 0.99,
+        epsilon         = 1.0,
+        epsilon_min     = 0.05,
+        epsilon_decay   = 0.999995,
+        memory_size     = 200_000,
+        batch_size      = batch_size,
+        tau             = 0.005,
+        n_step          = 3,
+    )
+    engine = MLGameEngine()
+
+    if resume and Path(model_path).exists():
+        agent.load(model_path)
+        print(f"Resumed from {model_path}  (ε={agent.epsilon:.4f})")
+    elif resume:
+        print(f"No checkpoint found at {model_path}, starting fresh.")
+
+    print(f"\n{'='*60}")
+    print(f"  DQN v4 Training — {episodes:,} episodes")
+    print(f"  Device : {agent.device}")
+    print(f"  gamma  : {agent.gamma}   ε-decay: {agent.epsilon_decay}")
+    print(f"  buffer : 200,000 (PER α=0.6)   batch: {batch_size}")
+    print(f"  n-step : {agent.n_step}   τ: {agent.tau}   LR: {agent.lr}")
+    print(f"{'='*60}\n")
+
+    turns_window   = []
+    rewards_window = []
+    best_median    = float('inf')
+    start_time     = time.time()
+
+    for ep in range(1, episodes + 1):
+        result = play_episode(agent, engine, training=True)
+        turns_window.append(result['turns'])
+        rewards_window.append(result['reward'])
+
+        # 3 gradient steps per episode (was 5 in v3)
+        if len(agent.per_buffer) >= agent.batch_size:
+            for _ in range(3):
+                agent.replay()
+
+        if ep % 500 == 0:
+            w          = min(500, len(turns_window))
+            avg_turns  = np.mean(turns_window[-w:])
+            avg_reward = np.mean(rewards_window[-w:])
+            elapsed    = time.time() - start_time
+            rate       = ep / elapsed
+            print(
+                f"Ep {ep:6d}/{episodes} | "
+                f"Turns(avg500): {avg_turns:5.1f} | "
+                f"Reward: {avg_reward:8.1f} | "
+                f"ε: {agent.epsilon:.4f} | "
+                f"{rate:.1f} games/s"
+            )
+
+        if ep % 5000 == 0:
+            stats = evaluate(agent, engine, n_games=200)
+            print_eval(stats, label=f'ep {ep:,}')
+
+            if stats['median'] < best_median:
+                best_median = stats['median']
+                agent.save(best_path)
+                print(f"  ★ New best: {best_median:.1f} turns  → saved to {best_path}")
+
+            if stats['median'] <= 25:
+                print(f"  ★★★ SUB-26 ACHIEVED: {stats['median']:.1f} turns ★★★")
+            if stats['median'] <= 20:
+                print(f"  ★★★ SUB-21 ACHIEVED: {stats['median']:.1f} turns ★★★")
+
+            agent.save(model_path)
+
+    agent.save(model_path)
+
+    print("\nRunning final evaluation (500 games)...")
+    final = evaluate(agent, engine, n_games=500)
+    print_eval(final, label='FINAL')
+    print(f"Best median during training: {best_median:.1f} turns")
+    elapsed = time.time() - start_time
+    print(f"Training time: {elapsed/60:.1f} minutes")
+    print(f"Checkpoint : {model_path}")
+    print(f"Best model : {best_path}")
+
+
+# ---------------------------------------------------------------------------
+# Eval-only mode
+# ---------------------------------------------------------------------------
+
+def eval_only(model_path: str, batch_size: int):
+    agent  = DQNAgentV4(batch_size=batch_size)
+    engine = MLGameEngine()
+
+    if not Path(model_path).exists():
+        print(f"No model found at {model_path}")
+        return
+
+    agent.load(model_path)
+    print(f"Loaded {model_path}")
+    print("Running 1,000-game benchmark...\n")
+    stats = evaluate(agent, engine, n_games=1000)
+    print_eval(stats, label='1000-game benchmark')
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train DQN v4 agent for Russian Yatzy')
+    parser.add_argument('--episodes', type=int, default=300_000)
+    parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--eval-only', action='store_true')
+    parser.add_argument('--model', type=str, default='models/dqn_v4.pth')
+    parser.add_argument('--best',  type=str, default='models/dqn_v4_best.pth')
+    parser.add_argument('--batch', type=int, default=256,
+                        help='Batch size — use 512 on a GPU machine for faster training')
+    args = parser.parse_args()
+
+    if args.eval_only:
+        eval_only(args.model, args.batch)
+    else:
+        train(args.episodes, args.resume, args.model, args.best, args.batch)

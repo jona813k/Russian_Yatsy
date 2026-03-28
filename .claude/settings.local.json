@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l c:JB_IdeasRussian_Yatsysrcgame/*.py)",
+      "Bash(find /c/JB_Ideas/Russian_Yatsy -not -path */node_modules/* -not -path */__pycache__/* -type f)",
+      "Bash(python simulate_rpg.py --games 20)",
+      "Bash(python simulate_rpg.py --games 50)",
+      "Bash(python simulate_rpg.py --games 200)"
+    ]
+  }
+}

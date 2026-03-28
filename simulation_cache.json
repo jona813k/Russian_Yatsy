@@ -1,0 +1,71 @@
+{
+  "probability": {
+    "avg_rolls": 73.96,
+    "min_rolls": 58,
+    "max_rolls": 105,
+    "avg_turns": 31.71,
+    "min_turns": 19,
+    "max_turns": 69,
+    "strategy_name": "Den Akademiske"
+  },
+  "completion": {
+    "avg_rolls": 92.38,
+    "min_rolls": 71,
+    "max_rolls": 114,
+    "avg_turns": 41.66,
+    "min_turns": 23,
+    "max_turns": 65,
+    "strategy_name": "Afslutteren"
+  },
+  "random": {
+    "avg_rolls": 90.69,
+    "min_rolls": 73,
+    "max_rolls": 116,
+    "avg_turns": 36.38,
+    "min_turns": 22,
+    "max_turns": 62,
+    "strategy_name": "Den Tilf\u00e6ldige"
+  },
+  "probability_1000": {
+    "avg_rolls": 73.839,
+    "median_rolls": 73,
+    "min_rolls": 50,
+    "max_rolls": 104,
+    "avg_turns": 31.412,
+    "median_turns": 30,
+    "min_turns": 15,
+    "max_turns": 63,
+    "std_turns": 0.2351175365641619,
+    "strategy_name": "AI1 - Sandsynlighedsstrategi"
+  },
+  "completion_1000": {
+    "avg_rolls": 91.283,
+    "min_rolls": 70,
+    "max_rolls": 132,
+    "avg_turns": 40.582,
+    "min_turns": 21,
+    "max_turns": 77,
+    "strategy_name": "Afslutteren"
+  },
+  "random_1000": {
+    "avg_rolls": 90.347,
+    "min_rolls": 70,
+    "max_rolls": 137,
+    "avg_turns": 35.951,
+    "min_turns": 18,
+    "max_turns": 83,
+    "strategy_name": "Den Tilf\u00e6ldige"
+  },
+  "dqn_1000": {
+    "avg_rolls": 83.997,
+    "median_rolls": 84,
+    "min_rolls": 64,
+    "max_rolls": 107,
+    "avg_turns": 28.069,
+    "median_turns": 28,
+    "min_turns": 17,
+    "max_turns": 57,
+    "std_turns": 0.11669721076358251,
+    "strategy_name": "AI2 - DQN Neural Network"
+  }
+}

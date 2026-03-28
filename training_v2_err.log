@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "C:\JB_Ideas\Russian_Yatsy\train_v2.py", line 247, in <module>
+    train(args.episodes, args.resume, args.model, args.best)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\JB_Ideas\Russian_Yatsy\train_v2.py", line 143, in train
+    print(f"  gamma  : {agent.gamma}   \u03b5-decay: {agent.epsilon_decay}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u03b5' in position 18: character maps to <undefined>

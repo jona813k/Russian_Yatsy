@@ -1,0 +1,4 @@
+# Python dependencies
+# Add any required packages here
+numpy
+scipy
