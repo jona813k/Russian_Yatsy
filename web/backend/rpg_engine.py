@@ -24,16 +24,16 @@ from src.game.rules import GameRules
 # ---------------------------------------------------------------------------
 
 STAT_DEFS = {
-    1:  {'attr': 'attack_speed',  'per_die': -0.07, 'threshold': -0.07,  'has_threshold': True},
+    1:  {'attr': 'attack_speed',  'per_die': 0.015, 'threshold': 0.015,  'has_threshold': True},
     2:  {'attr': 'attack_dmg',    'per_die':  1,    'threshold':  1,     'has_threshold': True},
-    3:  {'attr': 'crit_chance',   'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
-    4:  {'attr': 'armor',         'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
-    5:  {'attr': 'max_hp',        'per_die':  15,   'threshold':  15,    'has_threshold': True},
+    3:  {'attr': 'crit_chance',   'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
+    4:  {'attr': 'armor',         'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
+    5:  {'attr': 'max_hp',        'per_die':  5,    'threshold':  5,     'has_threshold': True},
     6:  {'attr': 'item_slots',    'per_die':  0,    'threshold':  None,  'has_threshold': False, 'special': 'research'},
     7:  {'attr': 'gold',          'per_die':  20,   'threshold':  20,    'has_threshold': True},
     8:  {'attr': 'summon_level',  'per_die':  1,    'threshold':  1,     'has_threshold': True},
     9:  {'attr': 'spell_level',   'per_die':  1,    'threshold':  1,     'has_threshold': True},
-    10: {'attr': 'block_chance',  'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
+    10: {'attr': 'block_chance',  'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
     11: {'attr': 'lifesteal',     'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
     12: {'attr': 'dark_level',    'per_die':  1,    'threshold':  1,     'has_threshold': True},
 }
@@ -199,7 +199,7 @@ FORGE_LEVELS = [
     ],
 ]
 
-ATTACK_SPEED_FLOOR = 0.3  # minimum attack cooldown in seconds
+ATTACK_SPEED_CAP = 5.0  # maximum attacks per second (safety, not a balance cap)
 
 
 # ---------------------------------------------------------------------------
@@ -210,9 +210,9 @@ ATTACK_SPEED_FLOOR = 0.3  # minimum attack cooldown in seconds
 class PlayerStats:
     max_hp: int       = 100
     current_hp: int   = 100
-    attack_dmg: int   = 10
-    attack_speed: float = 2.0
-    crit_chance: float  = 0.05
+    attack_dmg: int   = 8
+    attack_speed: float = 0.5   # attacks per second
+    crit_chance: float  = 0.01
     armor: float        = 0.05
     block_chance: float = 0.03
     lifesteal: float    = 0.0
@@ -254,12 +254,19 @@ def get_dark_multiplier(hit_count: int, dark_level: int) -> float:
     Damage multiplier from dark vulnerability stacks.
     Only applies when the player has dark_level > 0.
     hit_count is the number of hits BEFORE the current attack.
+
+    Each dark level both raises the % bonus by 1 AND lowers the hit thresholds,
+    so investing heavily rewards you with earlier and stronger ramp-up.
+    Tier 2 threshold: max(3,  20 - dark_level)
+    Tier 3 threshold: max(8,  50 - dark_level * 2)
     """
     if dark_level == 0 or hit_count == 0:
         return 1.0
-    if hit_count < 20:
+    tier2 = max(3, 20 - dark_level)
+    tier3 = max(8, 50 - dark_level * 2)
+    if hit_count < tier2:
         bonus_pct = 10 + dark_level
-    elif hit_count < 50:
+    elif hit_count < tier3:
         bonus_pct = 25 + dark_level
     else:
         bonus_pct = 50 + dark_level
@@ -309,10 +316,10 @@ def apply_upgrades(player: PlayerStats, collections: dict) -> list:
         current = getattr(player, attr)
         new_val = current + gained
 
-        # Clamp attack speed
+        # Cap attacks per second
         if attr == 'attack_speed':
-            new_val = max(ATTACK_SPEED_FLOOR, new_val)
-            new_val = round(new_val, 3)
+            new_val = min(ATTACK_SPEED_CAP, new_val)
+            new_val = round(new_val, 4)
 
         # Heal HP when max_hp increases
         if attr == 'max_hp':
@@ -336,7 +343,7 @@ def apply_upgrades(player: PlayerStats, collections: dict) -> list:
 def _upgrade_desc(attr: str, gained: float, threshold: bool) -> str:
     bonus = ' (+threshold)' if threshold else ''
     labels = {
-        'attack_speed':  f'Attack speed {gained:.2f}s',
+        'attack_speed':  f'+{gained*100:.1f}% atk speed',
         'attack_dmg':    f'+{gained:.0f} attack damage',
         'crit_chance':   f'+{gained*100:.0f}% crit chance',
         'armor':         f'+{gained*100:.0f}% armor',
@@ -383,7 +390,8 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
     eff_crit    = player.crit_chance + (0.05 if has_lucky_charm    else 0)
     eff_dmg     = player.attack_dmg  + (8    if has_iron_gauntlets else 0)
     eff_armor   = min(0.90, player.armor + (0.10 if has_ancient_shield else 0))
-    eff_aspeed  = max(ATTACK_SPEED_FLOOR, player.attack_speed - (0.25 if has_battle_horn else 0))
+    eff_aspeed  = min(ATTACK_SPEED_CAP, player.attack_speed + (0.1 if has_battle_horn else 0))  # attacks/s
+    atk_cd      = round(1.0 / eff_aspeed, 4)   # cooldown derived from attacks/s
     phoenix_used = [False]
 
     # Mutable state (use lists to allow mutation inside nested functions)
@@ -407,7 +415,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
         heapq.heappush(queue, (round(t, 4), counter[0], etype, data or {}))
 
     # Schedule first events
-    push(eff_aspeed,     'player_attack')
+    push(atk_cd,         'player_attack')
     push(enemy['speed'], 'enemy_attack')
     if player.spell_level > 0:
         push(spell_cooldown, 'spell')
@@ -444,7 +452,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
                 'enemy_hp': enemy_hp[0], 'player_hp': player_hp[0],
             })
             if enemy_hp[0] > 0:
-                push(t + eff_aspeed, 'player_attack')
+                push(t + atk_cd, 'player_attack')
 
         elif etype == 'spell':
             dmg = 5 + 3 * player.spell_level + (10 if has_mana_surge else 0)

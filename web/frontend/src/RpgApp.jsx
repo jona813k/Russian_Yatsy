@@ -44,16 +44,16 @@ const STAT_LABELS = {
 
 // Per-die effect and bonus threshold info for the upgrade tracker tooltips
 const UPGRADE_INFO = {
-  1:  { perDie: '-0.07s cooldown',   bonus: '-0.07s at 4' },
+  1:  { perDie: '+3% atk speed',      bonus: '+3% atk speed at 4' },
   2:  { perDie: '+1 attack dmg',     bonus: '+1 dmg at 4' },
-  3:  { perDie: '+2% crit',          bonus: '+2% crit at 4' },
-  4:  { perDie: '+1% armor',         bonus: '+1% armor at 4' },
-  5:  { perDie: '+15 max HP',        bonus: '+15 HP at 4' },
+  3:  { perDie: '+1% crit',          bonus: '+1% crit at 4' },
+  4:  { perDie: '+2% armor',         bonus: '+2% armor at 4' },
+  5:  { perDie: '+5 max HP',         bonus: '+5 HP at 4' },
   6:  { perDie: null,                bonus: '+1 item slot at 4  /  +1 free pick at 6' },
   7:  { perDie: '+20 gold',          bonus: '+20 gold at 4' },
   8:  { perDie: '+1 summon level',   bonus: '+1 summon at 4' },
   9:  { perDie: '+1 spell level',    bonus: '+1 spell at 4' },
-  10: { perDie: '+1% block chance',  bonus: '+1% block at 3' },
+  10: { perDie: '+2% block chance',  bonus: '+2% block at 3' },
   11: { perDie: '+1% lifesteal',     bonus: '+1% lifesteal at 3' },
   12: { perDie: '+1 dark level',     bonus: '+1 dark at 3' },
 };
