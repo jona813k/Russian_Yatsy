@@ -300,8 +300,12 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const selectedNumber = yatzy?.selected_number;
   const turnsRemaining = yatzy?.turns_remaining ?? 0;
 
+  const statRemoved = run.stat_removed || [];
+  const statTargets = run.stat_targets || {};
+
   const legalNumbers = legalActions
     .filter(a => a.type === 'select' || a.type === 'collect')
+    .filter(a => !statRemoved.includes(a.number))
     .map(a => a.number);
   const hasSkipOnly = legalActions.length === 1 && legalActions[0]?.type === 'skip_turn';
 
@@ -519,20 +523,30 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       }}>
         {Array.from({ length: 12 }, (_, i) => {
           const n = i + 1;
-          const count = parseInt(progress[String(n)] || 0);
+          const removed = statRemoved.includes(n);
+          const target = statTargets[n] ?? 6;
+          const count = Math.min(parseInt(progress[String(n)] || 0), target);
           const info = UPGRADE_INFO[n];
-          const thresholdAt = n >= 10 ? 3 : 4;
-          const tooltipLines = [
-            info.perDie ? `Each die: ${info.perDie}` : null,
-            `Collect ${thresholdAt}: ${info.bonus}`,
-          ].filter(Boolean).join('\n');
+          const baseThreshold = n >= 10 ? 3 : 4;
+          const thresholdAt = target !== 6 ? Math.max(1, Math.round(baseThreshold * target / 6)) : baseThreshold;
+          const tooltipLines = removed
+            ? 'Removed by specialisation — no stat gain, but dice still count toward pair combinations.'
+            : [
+                info.perDie ? `Each die: ${info.perDie}` : null,
+                `Collect ${thresholdAt}: ${info.bonus}`,
+                target !== 6 ? `Target: ${target} (modified by specialisation)` : null,
+              ].filter(Boolean).join('\n');
           return (
             <div key={n} style={{
-              background: '#1a1a3e', borderRadius: 6, padding: '6px 4px',
-              textAlign: 'center', border: `1px solid ${C.border}`, position: 'relative',
+              background: removed ? '#111' : '#1a1a3e',
+              borderRadius: 6, padding: '6px 4px',
+              textAlign: 'center',
+              border: `1px solid ${removed ? '#333' : C.border}`,
+              opacity: removed ? 0.45 : 1,
+              position: 'relative',
             }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-                <span style={{ fontSize: 11, color: C.muted }}>{n}</span>
+                <span style={{ fontSize: 11, color: removed ? '#555' : C.muted }}>{n}</span>
                 <span
                   title={tooltipLines}
                   style={{
@@ -543,14 +557,14 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                   }}
                 >i</span>
               </div>
-              <div style={{ fontSize: 9, color: C.orange, marginBottom: 4, whiteSpace: 'nowrap' }}>
-                {DIE_STAT_LABELS[n]}
+              <div style={{ fontSize: 9, color: removed ? '#555' : C.orange, marginBottom: 4, whiteSpace: 'nowrap' }}>
+                {removed ? '✕' : DIE_STAT_LABELS[n]}
               </div>
               <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                {Array.from({ length: 6 }, (_, j) => (
+                {Array.from({ length: target }, (_, j) => (
                   <div key={j} style={{
-                    width: 6, height: 14, borderRadius: 2,
-                    background: j < count ? C.green : '#333',
+                    width: Math.max(4, Math.floor(36 / target)), height: 14, borderRadius: 2,
+                    background: removed ? '#222' : (j < count ? C.green : '#333'),
                   }} />
                 ))}
               </div>
@@ -904,6 +918,59 @@ function CombatScreen({ run, runId, onRunUpdate, onError }) {
         )
       }
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pre-game forge screen — pick a specialisation before the first enemy
+// ---------------------------------------------------------------------------
+
+function PreGameForgeScreen({ run, runId, onRunUpdate, onError }) {
+  const [loading, setLoading] = useState(false);
+  const choices = run.pre_game_forge_choices || [];
+
+  async function pick(choiceId) {
+    setLoading(true);
+    try {
+      const resp = await rpgApi.preGameForgePick(runId, choiceId);
+      onRunUpdate(resp);
+    } catch (e) { if (onError) onError(e); else console.error(e); }
+    setLoading(false);
+  }
+
+  return (
+    <Panel style={{ maxWidth: 520 }}>
+      <div style={{ color: C.gold, fontWeight: 'bold', fontSize: 22, marginBottom: 4 }}>
+        ⚗️ Specialisation
+      </div>
+      <div style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>
+        Choose your path before the first battle. This alters your upgrade board
+        for the entire run — some stats become easier to max, others are removed entirely.
+        Removed stats are shown greyed out on your board but their dice still count toward pair combinations.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {choices.map(choice => (
+          <div key={choice.id} style={{
+            background: '#1a1228', border: `1px solid ${C.gold}`,
+            borderRadius: 8, padding: 14,
+            display: 'flex', alignItems: 'flex-start', gap: 14,
+          }}>
+            <div style={{ fontSize: 28, lineHeight: 1 }}>{choice.icon}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: C.yellow, fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>
+                {choice.name}
+              </div>
+              <div style={{ color: C.muted, fontSize: 13, marginBottom: 10 }}>{choice.desc}</div>
+              <Btn onClick={() => pick(choice.id)} disabled={loading} color={C.orange}
+                style={{ fontSize: 13, padding: '6px 16px' }}>
+                Choose
+              </Btn>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
@@ -1400,6 +1467,11 @@ export default function RpgApp({ onBack }) {
   const phase = run.phase;
 
   function renderMain() {
+    if (phase === 'pre_game_forge') {
+      return (
+        <PreGameForgeScreen run={run} runId={runId} onRunUpdate={handleRunUpdate} onError={handleError} />
+      );
+    }
     if (phase === 'upgrade') {
       return (
         <UpgradePhase run={run} runId={runId} onRunUpdate={handleRunUpdate} onError={handleError} />

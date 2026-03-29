@@ -17,6 +17,8 @@ from typing import Optional
 
 from src.game.ml_engine import MLGameEngine
 from src.game.rules import GameRules
+from src.models.player import Player
+from src.models.game_state import GameState
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +203,49 @@ FORGE_LEVELS = [
 
 ATTACK_SPEED_CAP = 5.0  # maximum attacks per second (safety, not a balance cap)
 
+# Pre-game forge — picked before the first enemy, alters the upgrade table.
+# stat_targets: override the collection cap (default 6) per stat number.
+# stat_removed: these stat numbers are disabled for the entire run.
+PRE_GAME_FORGE = [
+    {
+        'id':   'spec_a',
+        'name': 'Dark Pact',
+        'desc': (
+            'You sacrifice Attack Damage entirely — that stat is removed from '
+            'your upgrade board for the whole run. In return, Dark vulnerability '
+            'fires after only 5 stacks (instead of 6), and Attack Speed requires '
+            '7 stacks to max out (threshold at 5).'
+        ),
+        'icon': '🌑',
+        'stat_targets': {1: 7, 12: 5},
+        'stat_removed': [2],
+    },
+    {
+        'id':   'spec_b',
+        'name': 'Aggressor',
+        'desc': (
+            'Attack Speed, Attack Damage, and Crit all fire at 5 stacks instead '
+            'of 6, and their threshold bonuses trigger at 3 stacks instead of 4. '
+            'Pure offensive build that comes online fast.'
+        ),
+        'icon': '⚔️',
+        'stat_targets': {1: 5, 2: 5, 3: 5},
+        'stat_removed': [],
+    },
+    {
+        'id':   'spec_c',
+        'name': 'Glasscannon',
+        'desc': (
+            'Armor and HP are removed from your upgrade board entirely. '
+            'Attack Speed and Attack Damage require 7 stacks to max out '
+            '(threshold at 5). You live and die by summons, spells, and dark.'
+        ),
+        'icon': '💀',
+        'stat_targets': {1: 7, 2: 7},
+        'stat_removed': [4, 5],
+    },
+]
+
 
 # ---------------------------------------------------------------------------
 # Player stats
@@ -273,16 +318,32 @@ def get_dark_multiplier(hit_count: int, dark_level: int) -> float:
     return 1.0 + bonus_pct / 100.0
 
 
-def apply_upgrades(player: PlayerStats, collections: dict) -> list:
+def apply_upgrades(player: PlayerStats, collections: dict,
+                   stat_targets: dict = None, stat_removed: list = None) -> list:
     """
     Apply upgrade phase collections to player stats.
-    collections: {1: count, 2: count, ..., 12: count}
+    collections:  {1: count, 2: count, ..., 12: count}
+    stat_targets: optional override of the collection cap per stat (default 6).
+                  Also scales the threshold proportionally.
+    stat_removed: stat numbers that are disabled and yield no upgrade.
     Returns a list of human-readable upgrade events for the UI.
     """
     events = []
+    _targets  = stat_targets or {}
+    _removed  = set(stat_removed or [])
 
     for num in range(1, 13):
         count = collections.get(num, 0)
+        if count == 0:
+            continue
+
+        # Skip stats removed by the pre-game forge
+        if num in _removed:
+            continue
+
+        # Cap collections at the stat's target (default 6)
+        target = _targets.get(num, 6)
+        count = min(count, target)
         if count == 0:
             continue
 
@@ -290,24 +351,27 @@ def apply_upgrades(player: PlayerStats, collections: dict) -> list:
         attr = defn['attr']
 
         # Special case: research (number 6)
-        # 4 collected → +1 item slot; 6 collected → also +1 free item credit
+        # threshold scales with target: at 4/6 and 6/6 normally
         if defn.get('special') == 'research':
-            if count >= 4:
+            slot_threshold = max(1, int(4 * target / 6 + 0.5))
+            free_threshold = target
+            if count >= slot_threshold:
                 player.item_slots += 1
                 events.append({'number': num, 'stat': 'item_slots', 'gained': 1,
                                'threshold_bonus': False, 'desc': '+1 item slot'})
-            if count >= 6:
+            if count >= free_threshold:
                 player.free_items += 1
                 events.append({'number': num, 'stat': 'free_items', 'gained': 1,
                                'threshold_bonus': True, 'desc': '+1 free item pick'})
             continue
 
-        # Normal stats
+        # Normal stats — threshold scales proportionally with target
         per_die = defn['per_die']
         gained = per_die * count
         threshold_bonus = False
 
-        threshold_at = 3 if num >= 10 else 4
+        base_threshold = 3 if num >= 10 else 4
+        threshold_at = max(1, int(base_threshold * target / 6 + 0.5)) if target != 6 else base_threshold
         if defn['has_threshold'] and count >= threshold_at:
             gained += defn['threshold']
             threshold_bonus = True
@@ -634,6 +698,114 @@ class StatefulDiceRoller:
 
 
 # ---------------------------------------------------------------------------
+# RPG-aware engine subclasses
+# ---------------------------------------------------------------------------
+
+class RPGPlayer(Player):
+    """
+    Player subclass that uses per-stat collection targets instead of the
+    hardcoded GameRules.TARGET_PER_NUMBER = 6.
+
+    - stat_targets: {num: target} — overrides the completion threshold per stat.
+    - stat_removed: list of stat numbers that are disabled for this run.
+      Their progress is pre-filled to 6 so the engine never offers them.
+    """
+    def __init__(self, name: str, stat_targets: dict, stat_removed: list):
+        super().__init__(name)
+        self._stat_targets = stat_targets
+        for n in stat_removed:
+            self.progress[n] = 6   # engine sees them as already complete
+
+    def target_for(self, number: int) -> int:
+        return self._stat_targets.get(number, 6)
+
+    def add_collected(self, number: int, count: int) -> bool:
+        target = self.target_for(number)
+        current = self.progress.get(number, 0)
+        new_total = min(current + count, target)
+        self.progress[number] = new_total
+        return new_total >= target and current < target
+
+    def is_winner(self) -> bool:
+        # Never signal "won" to the engine — the RPG uses turn-based upgrade_done
+        return False
+
+
+class RPGUpgradeEngine(MLGameEngine):
+    """
+    MLGameEngine subclass that delegates legal-action and completion checks
+    to RPGPlayer so per-stat targets are respected.
+    """
+    def __init__(self, stat_targets: dict, stat_removed: list,
+                 num_dice: int = None, roll_fn=None):
+        self._rpg_stat_targets = stat_targets
+        self._rpg_stat_removed = stat_removed
+        super().__init__(num_dice=num_dice, roll_fn=roll_fn)
+        self._install_rpg_player()
+
+    def _install_rpg_player(self):
+        rpg_player = RPGPlayer("RPG_Agent", self._rpg_stat_targets, self._rpg_stat_removed)
+        self.player = rpg_player
+        self.state.players = [self.player]
+
+    def reset(self):
+        """Override reset to keep the RPGPlayer instead of replacing with a plain Player."""
+        self._install_rpg_player()
+        self.state = GameState()
+        self.state.players = [self.player]
+        self.state.current_player_index = 0
+        self.turn_number = 0
+        self.total_rolls = 0
+        self.start_new_turn()
+
+    def _target_for(self, number: int) -> int:
+        return self.player.target_for(number)
+
+    def get_legal_actions(self) -> list:
+        legal_actions = []
+        if self.state.selected_number is None:
+            for target in range(GameRules.MIN_NUMBER, GameRules.MAX_NUMBER + 1):
+                if self._can_make_number(self.state.dice_values, target):
+                    current_count = self.player.progress.get(target, 0)
+                    stat_target = self._target_for(target)
+                    if current_count < stat_target:
+                        collectible = self._count_collectible(self.state.dice_values, target)
+                        legal_actions.append({
+                            'type': 'select',
+                            'number': target,
+                            'collectible': collectible,
+                            'progress': current_count,
+                            'remaining_needed': stat_target - current_count,
+                        })
+            if not legal_actions:
+                legal_actions.append({'type': 'skip_turn', 'reason': 'no_valid_numbers'})
+        else:
+            target = self.state.selected_number
+            stat_target = self._target_for(target)
+            if self._can_make_number(self.state.dice_values, target):
+                collectible = self._count_collectible(self.state.dice_values, target)
+                legal_actions.append({
+                    'type': 'collect',
+                    'number': target,
+                    'collectible': collectible,
+                    'progress': self.player.progress.get(target, 0),
+                    'remaining_needed': stat_target - self.player.progress.get(target, 0),
+                })
+        return legal_actions
+
+    def _execute_select_and_collect(self, target: int) -> dict:
+        # Use per-stat target for the "already completed" guard
+        if self.player.progress.get(target, 0) >= self._target_for(target):
+            return {
+                'success': False,
+                'reward': -100,
+                'state': 'illegal',
+                'info': {'error': f'{target} already completed (custom target)'},
+            }
+        return super()._execute_select_and_collect(target)
+
+
+# ---------------------------------------------------------------------------
 # Run state
 # ---------------------------------------------------------------------------
 
@@ -643,8 +815,11 @@ class RPGRun:
         self.player          = PlayerStats()
         self.level_idx       = 0       # 0-indexed
         self.fight_idx       = 0       # 0-indexed within level
-        self.phase           = 'upgrade'
+        self.phase           = 'pre_game_forge'
         self.upgrade_engine  = None
+        # Pre-game forge state
+        self.stat_targets: dict = {}   # {num: target} — empty means all default to 6
+        self.stat_removed: list = []   # stat numbers disabled for this run
         self.upgrade_turns_used = 0
         self.upgrade_done    = False
         self.last_combat     = None
@@ -684,7 +859,9 @@ class RPGRun:
 
     def _init_upgrade_phase(self):
         self._dice_roller = StatefulDiceRoller(self.player)
-        self.upgrade_engine = MLGameEngine(
+        self.upgrade_engine = RPGUpgradeEngine(
+            stat_targets=self.stat_targets,
+            stat_removed=self.stat_removed,
             num_dice=self._dice_roller.total,
             roll_fn=self._dice_roller,
         )
@@ -713,7 +890,7 @@ class RPGRun:
         # Accumulate into run-level history
         for n, count in collections.items():
             self.total_collections[n] = self.total_collections.get(n, 0) + count
-        upgrades = apply_upgrades(self.player, collections)
+        upgrades = apply_upgrades(self.player, collections, self.stat_targets, self.stat_removed)
         self.last_upgrades = upgrades
         self.phase = 'combat'
         return upgrades
@@ -810,6 +987,22 @@ class RPGRun:
             self._init_upgrade_phase()
 
     # ------------------------------------------------------------------
+    # Pre-game forge
+    # ------------------------------------------------------------------
+
+    def pick_pre_game_forge(self, choice_id: str) -> tuple[bool, str]:
+        """Apply a pre-game forge choice and start the first upgrade phase."""
+        choice = next((c for c in PRE_GAME_FORGE if c['id'] == choice_id), None)
+        if not choice:
+            return False, 'invalid choice'
+        self.stat_targets = dict(choice.get('stat_targets', {}))
+        self.stat_removed = list(choice.get('stat_removed', []))
+        self.forge_history.append(choice_id)
+        self.phase = 'upgrade'
+        self._init_upgrade_phase()
+        return True, 'ok'
+
+    # ------------------------------------------------------------------
     # Forge
     # ------------------------------------------------------------------
 
@@ -904,6 +1097,7 @@ class RPGRun:
         if li > self.level_idx: return 'upcoming'
         if fi < self.fight_idx: return 'done'
         if fi > self.fight_idx: return 'upcoming'
+        if self.phase == 'pre_game_forge': return 'upcoming'
         if self.phase == 'upgrade' and not self.upgrade_done: return 'current'
         return 'done'
 
@@ -977,6 +1171,9 @@ class RPGRun:
         return {
             'run_id':              self.run_id,
             'phase':               'upgrade_done' if (self.phase == 'upgrade' and self.upgrade_done) else self.phase,
+            'stat_targets':        self.stat_targets,
+            'stat_removed':        self.stat_removed,
+            'pre_game_forge_choices': PRE_GAME_FORGE if self.phase == 'pre_game_forge' else [],
             'level':               self.level_idx + 1,
             'fight_index':         self.fight_idx,
             'is_boss':             enemy['is_boss'] if enemy else False,

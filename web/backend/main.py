@@ -287,6 +287,9 @@ class ItemRequest(BaseModel):
     item_id: str
     use_free: bool = False
 
+class PreGameForgeRequest(BaseModel):
+    choice_id: str
+
 
 # ---------------------------------------------------------------------------
 # RPG routes
@@ -315,6 +318,8 @@ def rpg_upgrade_select(run_id: str, body: SelectRequest):
 
     engine = run.upgrade_engine
     legal = engine.get_legal_actions()
+    if body.number in run.stat_removed:
+        raise HTTPException(status_code=400, detail=f"Stat {body.number} has been removed by your specialisation")
     legal_numbers = [a['number'] for a in legal if a['type'] in ('select', 'collect')]
     if body.number not in legal_numbers:
         raise HTTPException(status_code=400, detail=f"{body.number} is not a legal move")
@@ -432,6 +437,18 @@ def rpg_shop_close(run_id: str):
 
 class ForgeRequest(BaseModel):
     choice_id: str
+
+
+@app.post("/api/rpg/{run_id}/pre_game_forge/pick")
+def rpg_pre_game_forge_pick(run_id: str, body: PreGameForgeRequest):
+    """Pick a pre-game forge specialisation before the first enemy."""
+    run = get_run(run_id)
+    if run.phase != 'pre_game_forge':
+        raise HTTPException(status_code=400, detail="Not in pre-game forge phase")
+    ok, reason = run.pick_pre_game_forge(body.choice_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=reason)
+    return build_rpg_state(run)
 
 
 @app.post("/api/rpg/{run_id}/forge/pick")

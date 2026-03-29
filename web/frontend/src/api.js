@@ -81,6 +81,10 @@ export const rpgApi = {
   /** Leave the shop and proceed to next level. */
   closeShop: (runId) => request('POST', `/rpg/${runId}/shop/close`),
 
+  /** Pick a pre-game forge specialisation before the first enemy. */
+  preGameForgePick: (runId, choiceId) =>
+    request('POST', `/rpg/${runId}/pre_game_forge/pick`, { choice_id: choiceId }),
+
   /** Pick a forge upgrade after defeating a boss. */
   forgePick: (runId, choiceId) =>
     request('POST', `/rpg/${runId}/forge/pick`, { choice_id: choiceId }),
