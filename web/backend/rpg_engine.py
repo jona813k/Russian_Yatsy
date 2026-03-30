@@ -62,8 +62,8 @@ LEVELS = [
         'level': 2,
         'upgrade_turns': 5,
         'enemies': [
-            {'name': 'Orc Warrior',   'hp': 200, 'attack': 10, 'speed': 2.0, 'is_boss': False},
-            {'name': 'Orc Berserker', 'hp': 180, 'attack': 14, 'speed': 1.5, 'is_boss': False},
+            {'name': 'Orc Warrior',   'hp': 350,  'attack': 14, 'speed': 2.0, 'armor': 0.10, 'is_boss': False},
+            {'name': 'Orc Berserker', 'hp': 300,  'attack': 18, 'speed': 1.5, 'armor': 0.10, 'regen': 3, 'is_boss': False},
             {'name': 'Orc Warchief',  'hp': 1200, 'attack': 16, 'speed': 2.0, 'is_boss': True},
         ],
     },
@@ -71,8 +71,8 @@ LEVELS = [
         'level': 3,
         'upgrade_turns': 4,
         'enemies': [
-            {'name': 'Dark Knight',  'hp':  350, 'attack': 20, 'speed': 2.0, 'is_boss': False},
-            {'name': 'Shadow Mage',  'hp':  280, 'attack': 24, 'speed': 1.5, 'is_boss': False},
+            {'name': 'Dark Knight',  'hp': 600,  'attack': 26, 'speed': 2.0, 'armor': 0.20, 'is_boss': False},
+            {'name': 'Shadow Mage',  'hp': 500,  'attack': 28, 'speed': 1.5, 'armor': 0.20, 'lifesteal': 0.6, 'is_boss': False},
             {'name': 'Demon Lord',   'hp': 2000, 'attack': 30, 'speed': 1.8, 'is_boss': True},
         ],
     },
@@ -209,40 +209,33 @@ ATTACK_SPEED_CAP = 5.0  # maximum attacks per second (safety, not a balance cap)
 PRE_GAME_FORGE = [
     {
         'id':   'spec_a',
-        'name': 'Dark Pact',
-        'desc': (
-            'You sacrifice Attack Damage entirely — that stat is removed from '
-            'your upgrade board for the whole run. In return, Dark vulnerability '
-            'fires after only 5 stacks (instead of 6), and Attack Speed requires '
-            '7 stacks to max out (threshold at 5).'
-        ),
-        'icon': '🌑',
-        'stat_targets': {1: 7, 12: 5},
-        'stat_removed': [2],
+        'name': 'Standard',
+        'desc': 'No changes. All stats upgrade normally.',
+        'icon': '⚖️',
+        'stat_targets': {},
+        'stat_removed': [],
     },
     {
         'id':   'spec_b',
         'name': 'Aggressor',
         'desc': (
-            'Attack Speed, Attack Damage, and Crit all fire at 5 stacks instead '
-            'of 6, and their threshold bonuses trigger at 3 stacks instead of 4. '
-            'Pure offensive build that comes online fast.'
+            'Attack Speed, Damage, and Crit max out at 4 stacks — they come online fast. '
+            'HP and Armor require 7 stacks instead.'
         ),
         'icon': '⚔️',
-        'stat_targets': {1: 5, 2: 5, 3: 5},
+        'stat_targets': {1: 4, 2: 4, 3: 4, 4: 7, 5: 7},
         'stat_removed': [],
     },
     {
         'id':   'spec_c',
-        'name': 'Glasscannon',
+        'name': 'Mage',
         'desc': (
-            'Armor and HP are removed from your upgrade board entirely. '
-            'Attack Speed and Attack Damage require 7 stacks to max out '
-            '(threshold at 5). You live and die by summons, spells, and dark.'
+            'Spell and Summon max out at 5 stacks. '
+            'Attack Speed, Damage, and Crit require 7 stacks instead.'
         ),
-        'icon': '💀',
-        'stat_targets': {1: 7, 2: 7},
-        'stat_removed': [4, 5],
+        'icon': '🔮',
+        'stat_targets': {1: 7, 2: 7, 3: 7, 8: 5, 9: 5},
+        'stat_removed': [],
     },
 ]
 
@@ -450,6 +443,11 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
 
     spell_cooldown = 2.5 if has_focusing_lens else 4.0
 
+    # Enemy special properties
+    enemy_armor    = enemy.get('armor',    0.0)
+    enemy_regen    = enemy.get('regen',    0)
+    enemy_lifesteal= enemy.get('lifesteal',0.0)
+
     # Item-modified combat stats (applied locally, not mutating player)
     eff_crit    = player.crit_chance + (0.05 if has_lucky_charm    else 0)
     eff_dmg     = player.attack_dmg  + (8    if has_iron_gauntlets else 0)
@@ -485,6 +483,8 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
         push(spell_cooldown, 'spell')
     if summon:
         push(summon['speed'], 'summon_attack')
+    if enemy_regen > 0:
+        push(1.0, 'enemy_regen')
 
     MAX_TIME = 300.0  # safety cap — 5 minutes
 
@@ -499,7 +499,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
             if crit:
                 dmg = dmg * 2
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-            dmg = max(1, int(dmg * dark_mult))
+            dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
             hit_count[0] += 1
 
             heal = 0
@@ -519,9 +519,9 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
                 push(t + atk_cd, 'player_attack')
 
         elif etype == 'spell':
-            dmg = 5 + 3 * player.spell_level + (10 if has_mana_surge else 0)
+            dmg = 17 + 3 * player.spell_level + (10 if has_mana_surge else 0)
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-            dmg = max(1, int(dmg * dark_mult))
+            dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
             heal = 0
             if has_vampiric_tome:
                 heal = min(int(dmg * 0.30), player.max_hp - player_hp[0])
@@ -539,7 +539,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
             if summon_alive[0]:
                 dmg = summon['attack']
                 dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-                dmg = max(1, int(dmg * dark_mult))
+                dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
                 enemy_hp[0] = max(0, enemy_hp[0] - dmg)
                 events.append({
                     'time': t, 'type': 'summon_attack',
@@ -547,6 +547,17 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
                 })
                 if enemy_hp[0] > 0:
                     push(t + summon['speed'], 'summon_attack')
+
+        elif etype == 'enemy_regen':
+            heal = min(enemy_regen, enemy['hp'] - enemy_hp[0])
+            if heal > 0:
+                enemy_hp[0] += heal
+                events.append({
+                    'time': t, 'type': 'enemy_regen',
+                    'heal': heal, 'enemy_hp': enemy_hp[0],
+                })
+            if enemy_hp[0] > 0:
+                push(t + 1.0, 'enemy_regen')
 
         elif etype == 'enemy_attack':
             blocked = rng.random() < player.block_chance
@@ -572,6 +583,14 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
                     enemy_hp[0] = max(0, enemy_hp[0] - thorns)
                     ev['thorns'] = thorns
                     ev['enemy_hp'] = enemy_hp[0]
+
+                # Enemy lifesteal — heals enemy when it hits
+                if enemy_lifesteal > 0 and enemy_hp[0] > 0:
+                    ls_heal = min(int(dmg_to_player * enemy_lifesteal), enemy['hp'] - enemy_hp[0])
+                    if ls_heal > 0:
+                        enemy_hp[0] += ls_heal
+                        ev['enemy_lifesteal_heal'] = ls_heal
+                        ev['enemy_hp'] = enemy_hp[0]
 
                 # Summon also takes damage
                 if summon_alive[0]:

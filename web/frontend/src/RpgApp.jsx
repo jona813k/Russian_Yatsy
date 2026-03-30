@@ -224,7 +224,11 @@ function DieFace({ value }) {
       </svg>
     );
   }
-  return <span style={{ fontSize: 16, fontWeight: 'bold', lineHeight: '36px' }}>{value}</span>;
+  return (
+    <svg width={36} height={36} style={{ display: 'block' }}>
+      <text x={18} y={23} textAnchor="middle" fontSize={15} fontWeight="bold" fill="currentColor">{value}</text>
+    </svg>
+  );
 }
 
 // Base backgrounds per die type (used for normal/idle state only)
@@ -241,7 +245,9 @@ function Die({ value, state, dieType, onClick }) {
     userSelected: { background: C.yellow,  color: '#222',  border: `2px solid ${C.orange}` },
     preview:      { background: '#fff3cd', color: '#222',  border: `2px dashed ${C.orange}` },
     illegal:      { background: '#444',    color: '#666',  border: '2px solid #333' },
-    setAside:     { background: '#555',    color: '#888',  border: '2px solid #444' },
+    // Stashed dice keep their type colour but dimmed so you can still track your pool
+    setAside:     { background: typeBg ? `${typeBg}77` : '#555', color: typeBg ? '#333' : '#888', border: `2px solid ${typeBg || '#444'}` },
+    rolling:      { background: '#ccc',    color: '#555',  border: '2px solid #999' },
   };
   const s = styles[state] || styles.normal;
   return (
@@ -285,13 +291,24 @@ function computeCollectedValues(diceArr, targetNum) {
 function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const yatzy = run.yatzy;
   const [selectedIndices, setSelectedIndices] = useState([]);
-  const [skipTimer, setSkipTimer] = useState(null);
   const [failedDice, setFailedDice] = useState(null);
   const [actionResult, setActionResult] = useState(null);
   const [rerolling, setRerolling] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
+  const [isRolling, setIsRolling] = useState(false);
+  const [scramble, setScramble] = useState([]);
+
+  // Scramble animation — randomises displayed dice every 80 ms while rolling
+  useEffect(() => {
+    if (!isRolling) return;
+    const id = setInterval(() => {
+      setScramble(prev => prev.map(() => Math.ceil(Math.random() * 6)));
+    }, 80);
+    return () => clearInterval(id);
+  }, [isRolling]);
 
   const dice = yatzy?.dice || [];
+  const displayDice = isRolling ? scramble : dice;
   const diceTypes = yatzy?.dice_types || [];
   const progress = yatzy?.progress || {};
   const legalActions = yatzy?.legal_actions || [];
@@ -393,27 +410,26 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       if (resp.action_result?.info?.failed_dice) {
         setFailedDice(resp.action_result.info.failed_dice);
         setTimeout(() => { setFailedDice(null); onRunUpdate(resp); }, 1500);
+      } else if (st === 'completed_number') {
+        // Number finished — show rolling animation before revealing new dice
+        const count = (resp.yatzy?.dice || []).length || 6;
+        setScramble(Array.from({ length: count }, () => Math.ceil(Math.random() * 6)));
+        setIsRolling(true);
+        setTimeout(() => { setIsRolling(false); onRunUpdate(resp); }, 2000);
       } else {
         onRunUpdate(resp);
       }
     } catch (e) { if (onError) onError(e); else console.error(e); }
   }
 
-  // Auto-skip when no valid combos
-  useEffect(() => {
-    if (!hasSkipOnly || skipTimer) return;
-    const t = setTimeout(async () => {
-      setSkipTimer(null);
-      setStagedDice([]);
-      try {
-        const resp = await rpgApi.upgradeSkip(runId);
-        setActionResult(resp.action_result);
-        onRunUpdate(resp);
-      } catch (e) { if (onError) onError(e); else console.error(e); }
-    }, 1500);
-    setSkipTimer(t);
-    return () => clearTimeout(t);
-  }, [hasSkipOnly, runId]);
+  async function handleSkip() {
+    setStagedDice([]);
+    try {
+      const resp = await rpgApi.upgradeSkip(runId);
+      setActionResult(resp.action_result);
+      onRunUpdate(resp);
+    } catch (e) { if (onError) onError(e); else console.error(e); }
+  }
 
   if (!yatzy) return null;
 
@@ -437,9 +453,15 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       {failedDice && (
         <div style={{
           background: `${C.red}22`, border: `1px solid ${C.red}`,
-          borderRadius: 6, padding: '8px 12px', marginBottom: 10, color: C.red, fontSize: 13,
+          borderRadius: 6, padding: '8px 12px', marginBottom: 10,
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          No match — failed dice: {failedDice.join(', ')}
+          <span style={{ color: C.red, fontSize: 13 }}>No match —</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {failedDice.map((v, i) => (
+              <Die key={i} value={v} state="illegal" />
+            ))}
+          </div>
         </div>
       )}
 
@@ -455,8 +477,11 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             Roll
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', minHeight: 52 }}>
-            {dice.map((val, idx) => (
-              <Die key={idx} value={val} state={getDieState(idx)} dieType={diceTypes[idx]} onClick={() => handleDieClick(idx)} />
+            {displayDice.map((val, idx) => (
+              <Die key={idx} value={val}
+                state={isRolling ? 'rolling' : getDieState(idx)}
+                dieType={isRolling ? undefined : diceTypes[idx]}
+                onClick={isRolling ? undefined : () => handleDieClick(idx)} />
             ))}
           </div>
         </div>
@@ -500,9 +525,9 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       )}
 
       {hasSkipOnly && (
-        <div style={{ color: C.muted, fontSize: 13, marginBottom: 8 }}>
-          No valid moves — skipping turn…
-        </div>
+        <Btn onClick={handleSkip} color={C.muted} style={{ marginBottom: 8 }}>
+          No valid moves — Skip Turn
+        </Btn>
       )}
 
       {isLegalTarget && (() => {
@@ -808,6 +833,9 @@ function CombatScreen({ run, runId, onRunUpdate, onError }) {
         } else if (ev.type === 'summon_attack') {
           setEnemyHp(ev.enemy_hp);
           addLog(`${SUMMON_EMOJIS[summon?.name] ?? '🐾'} ${summon?.name ?? 'Summon'}: ${ev.dmg} dmg${ev.dark_mult > 1 ? ` 🌑×${ev.dark_mult}` : ''}`);
+        } else if (ev.type === 'enemy_regen') {
+          setEnemyHp(ev.enemy_hp);
+          addLog(`💚 ${enemy?.name} regenerates ${ev.heal} HP`);
         } else if (ev.type === 'enemy_attack') {
           if (ev.blocked) {
             addLog(`🛡️ ${enemy?.name} blocked!`);
@@ -817,7 +845,9 @@ function CombatScreen({ run, runId, onRunUpdate, onError }) {
             if (ev.summon_died) setSummonAlive(false);
             let msg = `💥 ${enemy?.name} hits for ${ev.dmg}`;
             if (ev.summon_died) msg += ` — ${summon?.name} defeated!`;
-            if (ev.thorns) { setEnemyHp(ev.enemy_hp); msg += ` (${ev.thorns} thorns)`; }
+            if (ev.thorns) msg += ` (${ev.thorns} thorns)`;
+            if (ev.enemy_lifesteal_heal) msg += ` 🩸+${ev.enemy_lifesteal_heal}hp`;
+            if (ev.enemy_hp != null) setEnemyHp(ev.enemy_hp);
             addLog(msg);
           }
         } else if (ev.type === 'combat_end') {
@@ -871,6 +901,29 @@ function CombatScreen({ run, runId, onRunUpdate, onError }) {
             alive={enemyHp > 0} accent={enemy?.is_boss ? C.red : C.orange}
             label={enemy?.is_boss ? '⚠️ BOSS' : 'ENEMY'}
           />
+          {/* Enchantment badges */}
+          {(enemy?.armor || enemy?.regen || enemy?.lifesteal) && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {enemy.armor > 0 && (
+                <span style={{
+                  background: '#1a2a1a', border: '1px solid #3a6b3a',
+                  borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#6bcf6b',
+                }}>🛡️ {Math.round(enemy.armor * 100)}% armor</span>
+              )}
+              {enemy.regen > 0 && (
+                <span style={{
+                  background: '#1a2a1a', border: '1px solid #3a6b3a',
+                  borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#4ade80',
+                }}>♻️ {enemy.regen} HP/s</span>
+              )}
+              {enemy.lifesteal > 0 && (
+                <span style={{
+                  background: '#2a1a1a', border: '1px solid #6b1a1a',
+                  borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#f87171',
+                }}>🩸 {Math.round(enemy.lifesteal * 100)}% lifesteal</span>
+              )}
+            </div>
+          )}
           {run.player.dark_level > 0 && darkStacks.hitCount > 0 && (
             <div style={{
               background: '#1a0a2a', border: '1px solid #6b21a8',
