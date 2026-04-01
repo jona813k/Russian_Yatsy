@@ -295,20 +295,15 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const [actionResult, setActionResult] = useState(null);
   const [rerolling, setRerolling] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
-  const [isRolling, setIsRolling] = useState(false);
-  const [scramble, setScramble] = useState([]);
 
-  // Scramble animation — randomises displayed dice every 80 ms while rolling
+  // Clear stash whenever the server says a new yatzy turn started
+  const yatzyTurn = yatzy?.turns ?? null;
   useEffect(() => {
-    if (!isRolling) return;
-    const id = setInterval(() => {
-      setScramble(prev => prev.map(() => Math.ceil(Math.random() * 6)));
-    }, 80);
-    return () => clearInterval(id);
-  }, [isRolling]);
+    setStagedDice([]);
+  }, [yatzyTurn]);
 
   const dice = yatzy?.dice || [];
-  const displayDice = isRolling ? scramble : dice;
+  const displayDice = dice;
   const diceTypes = yatzy?.dice_types || [];
   const progress = yatzy?.progress || {};
   const legalActions = yatzy?.legal_actions || [];
@@ -327,7 +322,9 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const hasSkipOnly = legalActions.length === 1 && legalActions[0]?.type === 'skip_turn';
 
   // Compute preview from selected dice
+  // If the engine is already in collect mode (selected_number set), use that directly
   const targetNumber = (() => {
+    if (selectedNumber !== null && selectedNumber !== undefined) return selectedNumber;
     if (selectedIndices.length === 0) return null;
     if (selectedIndices.length === 1) {
       const v = dice[selectedIndices[0]];
@@ -402,20 +399,13 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       setSelectedIndices([]);
       setActionResult(resp.action_result);
       const st = resp.action_result?.state;
-      if (st === 'turn_end' || st === 'completed_number' || st === 'won' || st === 'bonus_turn') {
-        setStagedDice([]);
-      } else {
+      const hasFailed = !!resp.action_result?.info?.failed_dice;
+      if (!hasFailed && st !== 'turn_end' && st !== 'completed_number' && st !== 'won' && st !== 'bonus_turn') {
         setStagedDice(prev => [...prev, ...justCollected]);
       }
-      if (resp.action_result?.info?.failed_dice) {
+      if (hasFailed) {
         setFailedDice(resp.action_result.info.failed_dice);
         setTimeout(() => { setFailedDice(null); onRunUpdate(resp); }, 1500);
-      } else if (st === 'completed_number') {
-        // Number finished — show rolling animation before revealing new dice
-        const count = (resp.yatzy?.dice || []).length || 6;
-        setScramble(Array.from({ length: count }, () => Math.ceil(Math.random() * 6)));
-        setIsRolling(true);
-        setTimeout(() => { setIsRolling(false); onRunUpdate(resp); }, 2000);
       } else {
         onRunUpdate(resp);
       }
@@ -456,8 +446,8 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
           borderRadius: 6, padding: '8px 12px', marginBottom: 10,
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <span style={{ color: C.red, fontSize: 13 }}>No match —</span>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <span style={{ color: C.red, fontSize: 13, whiteSpace: 'nowrap' }}>No match —</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {failedDice.map((v, i) => (
               <Die key={i} value={v} state="illegal" />
             ))}
@@ -479,9 +469,9 @@ function UpgradePhase({ run, runId, onRunUpdate, onError }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', minHeight: 52 }}>
             {displayDice.map((val, idx) => (
               <Die key={idx} value={val}
-                state={isRolling ? 'rolling' : getDieState(idx)}
-                dieType={isRolling ? undefined : diceTypes[idx]}
-                onClick={isRolling ? undefined : () => handleDieClick(idx)} />
+                state={getDieState(idx)}
+                dieType={diceTypes[idx]}
+                onClick={() => handleDieClick(idx)} />
             ))}
           </div>
         </div>
@@ -752,7 +742,7 @@ function RunPath({ run }) {
 // Combat screen — visual battle arena
 // ---------------------------------------------------------------------------
 
-const SUMMON_EMOJIS = { Imp: '😈', Wolf: '🐺', Orc: '👹', Wyvern: '🦎', Dragon: '🐉' };
+const SUMMON_EMOJIS = { Imp: '😈', Wolf: '🐺', Orc: '👹', Skeleton: '💀', Dragon: '🐉' };
 
 function CharacterCard({ name, emoji, hp, maxHp, alive = true, accent, label }) {
   return (
@@ -825,27 +815,43 @@ function CombatScreen({ run, runId, onRunUpdate, onError }) {
           setEnemyHp(ev.enemy_hp);
           setPlayerHp(ev.player_hp);
           if (ev.hit_count != null) setDarkStacks({ hitCount: ev.hit_count, mult: ev.dark_mult ?? 1.0 });
-          addLog(`⚔️ You hit for ${ev.dmg}${ev.crit ? ' (CRIT!)' : ''}${ev.heal > 0 ? ` +${ev.heal}hp` : ''}${ev.dark_mult > 1 ? ` 🌑×${ev.dark_mult}` : ''}`);
+          let atk = `⚔️ You hit for ${ev.dmg}${ev.crit ? ' (CRIT!)' : ''}${ev.execute ? ' ⚡EXECUTE' : ''}${ev.triple_hit ? ' ×3' : ''}`;
+          if (ev.heal > 0) atk += ` +${ev.heal}hp`;
+          if (ev.dark_mult > 1) atk += ` 🌑×${ev.dark_mult}`;
+          addLog(atk);
         } else if (ev.type === 'spell') {
           setEnemyHp(ev.enemy_hp);
           setPlayerHp(ev.player_hp);
-          addLog(`✨ Spell: ${ev.dmg} dmg${ev.heal > 0 ? ` +${ev.heal}hp` : ''}${ev.dark_mult > 1 ? ` 🌑×${ev.dark_mult}` : ''}`);
+          if (ev.summon_hp != null) setSummonHp(ev.summon_hp);
+          let sp = `✨ Spell: ${ev.dmg} dmg${ev.heal > 0 ? ` +${ev.heal}hp` : ''}`;
+          if (ev.dark_mult > 1) sp += ` 🌑×${ev.dark_mult}`;
+          if (ev.frost) sp += ' ❄️';
+          if (ev.burn_applied) sp += ' 🔥';
+          if (ev.summon_heal) sp += ` (${SUMMON_EMOJIS[summon?.name] ?? '🐾'}+${ev.summon_heal}hp)`;
+          addLog(sp);
+        } else if (ev.type === 'burn_tick') {
+          setEnemyHp(ev.enemy_hp);
+          addLog(`🔥 Burn: ${ev.dmg} dmg`);
         } else if (ev.type === 'summon_attack') {
           setEnemyHp(ev.enemy_hp);
-          addLog(`${SUMMON_EMOJIS[summon?.name] ?? '🐾'} ${summon?.name ?? 'Summon'}: ${ev.dmg} dmg${ev.dark_mult > 1 ? ` 🌑×${ev.dark_mult}` : ''}`);
+          addLog(`${SUMMON_EMOJIS[summon?.name] ?? '🐾'} ${summon?.name ?? 'Summon'}${ev.enraged ? ' 🔴' : ''}: ${ev.dmg} dmg${ev.dark_mult > 1 ? ` 🌑×${ev.dark_mult}` : ''}`);
         } else if (ev.type === 'enemy_regen') {
           setEnemyHp(ev.enemy_hp);
           addLog(`💚 ${enemy?.name} regenerates ${ev.heal} HP`);
         } else if (ev.type === 'enemy_attack') {
           if (ev.blocked) {
-            addLog(`🛡️ ${enemy?.name} blocked!`);
+            let blk = `🛡️ ${enemy?.name} blocked!`;
+            if (ev.thorns) blk += ` (${ev.thorns} reflected)`;
+            if (ev.enemy_hp != null) setEnemyHp(ev.enemy_hp);
+            addLog(blk);
           } else {
             setPlayerHp(ev.player_hp);
             if (ev.summon_hp != null) setSummonHp(ev.summon_hp);
             if (ev.summon_died) setSummonAlive(false);
-            let msg = `💥 ${enemy?.name} hits for ${ev.dmg}`;
+            let msg = ev.summon_hp != null && !ev.summon_died
+              ? `💥 ${enemy?.name} hits ${summon?.name} for ${ev.summon_dmg}`
+              : `💥 ${enemy?.name} hits for ${ev.dmg}`;
             if (ev.summon_died) msg += ` — ${summon?.name} defeated!`;
-            if (ev.thorns) msg += ` (${ev.thorns} thorns)`;
             if (ev.enemy_lifesteal_heal) msg += ` 🩸+${ev.enemy_lifesteal_heal}hp`;
             if (ev.enemy_hp != null) setEnemyHp(ev.enemy_hp);
             addLog(msg);

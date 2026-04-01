@@ -26,7 +26,7 @@ from src.models.game_state import GameState
 # ---------------------------------------------------------------------------
 
 STAT_DEFS = {
-    1:  {'attr': 'attack_speed',  'per_die': 0.015, 'threshold': 0.015,  'has_threshold': True},
+    1:  {'attr': 'attack_speed',  'per_die': 0.025, 'threshold': 0.025,  'has_threshold': True},
     2:  {'attr': 'attack_dmg',    'per_die':  1,    'threshold':  1,     'has_threshold': True},
     3:  {'attr': 'crit_chance',   'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
     4:  {'attr': 'armor',         'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
@@ -36,16 +36,16 @@ STAT_DEFS = {
     8:  {'attr': 'summon_level',  'per_die':  1,    'threshold':  1,     'has_threshold': True},
     9:  {'attr': 'spell_level',   'per_die':  1,    'threshold':  1,     'has_threshold': True},
     10: {'attr': 'block_chance',  'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
-    11: {'attr': 'lifesteal',     'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
+    11: {'attr': 'lifesteal',     'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
     12: {'attr': 'dark_level',    'per_die':  1,    'threshold':  1,     'has_threshold': True},
 }
 
 SUMMON_TIERS = [
-    {'min_level':  1, 'name': 'Imp',    'attack':  1, 'speed': 2.0, 'hp':  20},
-    {'min_level':  5, 'name': 'Wolf',   'attack':  3, 'speed': 2.0, 'hp':  50},
-    {'min_level': 10, 'name': 'Orc',    'attack':  6, 'speed': 2.0, 'hp': 150},
-    {'min_level': 15, 'name': 'Wyvern', 'attack': 11, 'speed': 2.0, 'hp': 400},
-    {'min_level': 20, 'name': 'Dragon', 'attack': 18, 'speed': 2.0, 'hp': 900},
+    {'min_level':  1, 'name': 'Imp',      'attack':  1, 'speed': 2.0, 'hp':  10},
+    {'min_level':  5, 'name': 'Wolf',     'attack':  3, 'speed': 2.0, 'hp':  25},
+    {'min_level': 10, 'name': 'Orc',      'attack':  6, 'speed': 2.0, 'hp':  50, 'enrage_below': 0.25},
+    {'min_level': 15, 'name': 'Skeleton', 'attack': 11, 'speed': 2.0, 'hp': 100, 'spell_vamp': 0.10, 'enrage_below': 0.25},
+    {'min_level': 20, 'name': 'Dragon',   'attack': 18, 'speed': 2.0, 'hp': 200, 'spell_vamp': 0.10, 'dragon_aura': 0.05, 'enrage_below': 0.25},
 ]
 
 LEVELS = [
@@ -79,66 +79,87 @@ LEVELS = [
 ]
 
 SHOP_ITEMS = [
-    {
-        'id': 'vampiric_tome',
-        'name': 'Vampiric Tome',
-        'cost': 100,
-        'desc': 'Your spell heals you for 30% of its damage.',
-    },
-    {
-        'id': 'thorns_vest',
-        'name': 'Thorns Vest',
-        'cost': 60,
-        'desc': 'When hit, deal 3 damage back to the attacker.',
-    },
-    {
-        'id': 'battle_drum',
-        'name': 'Battle Drum',
-        'cost': 80,
-        'desc': 'Your summon attacks 25% faster.',
-    },
-    {
-        'id': 'focusing_lens',
-        'name': 'Focusing Lens',
-        'cost': 120,
-        'desc': 'Your spell cooldown is reduced from 4s to 2.5s.',
-    },
-    {
-        'id': 'lucky_charm',
-        'name': 'Lucky Charm',
-        'cost': 70,
-        'desc': '+5% critical strike chance during combat.',
-    },
-    {
-        'id': 'iron_gauntlets',
-        'name': 'Iron Gauntlets',
-        'cost': 80,
-        'desc': '+8 attack damage during combat.',
-    },
-    {
-        'id': 'mana_surge',
-        'name': 'Mana Surge',
-        'cost': 90,
-        'desc': 'Your spell deals +10 bonus damage per cast.',
-    },
-    {
-        'id': 'ancient_shield',
-        'name': 'Ancient Shield',
-        'cost': 70,
-        'desc': '+10% damage reduction (armor) during combat.',
-    },
-    {
-        'id': 'battle_horn',
-        'name': 'Battle Horn',
-        'cost': 100,
-        'desc': 'Your attack cooldown is reduced by 0.25s.',
-    },
-    {
-        'id': 'phoenix_feather',
-        'name': 'Phoenix Feather',
-        'cost': 180,
-        'desc': 'Once per fight, survive a killing blow at 1 HP.',
-    },
+    # ── Tier 1 — first pre-boss shop ──────────────────────────────────────
+    # Attack DMG
+    {'id': 'atk_flat',         'name': 'Whetstone',           'tier': 1, 'cost': 100,
+     'desc': '+5 permanent attack damage.'},
+    {'id': 'triple_hit',       'name': 'Fury Talisman',       'tier': 1, 'cost': 100,
+     'desc': 'Every 3rd attack deals an additional 20 damage.'},
+    # Attack Speed
+    {'id': 'crit_125',         'name': 'Sharpshooter Lens',   'tier': 1, 'cost': 100,
+     'desc': 'Crits now deal 2.25× damage instead of 2×.'},
+    # Crit
+    {'id': 'armor_flat',       'name': 'Iron Plate',          'tier': 1, 'cost': 100,
+     'desc': '+10% permanent armor.'},
+    # Health
+    {'id': 'armor_hp_ratio',   'name': 'Bulwark Rune',        'tier': 1, 'cost': 100,
+     'desc': 'Gaining armor upgrades also gives HP (1% armor → 2 HP).'},
+    # Research
+    {'id': 'shop_free_reroll', 'name': 'Oracle Lens',         'tier': 1, 'cost': 100,
+     'desc': 'Future shops and forges each have 1 free reroll.'},
+    # Gold
+    {'id': 'item_discount',    'name': 'Merchant Badge',      'tier': 1, 'cost': 100,
+     'desc': 'Item costs are reduced by 20%.'},
+    {'id': 'gold_level_bonus', 'name': 'Gold Vein',           'tier': 1, 'cost': 100,
+     'desc': 'Gold upgrades give 5 extra gold per upgrade.'},
+    {'id': 'bounty_50g',       'name': 'Bounty Token',        'tier': 1, 'cost': 100,
+     'desc': 'Gain 50 gold each time you kill an enemy.'},
+    # Summon
+    {'id': 'summon_survive',   'name': 'Soul Tether',         'tier': 1, 'cost': 100,
+     'desc': 'Your summon survives fights and gains 1 level per fight won.'},
+    # Block
+    {'id': 'block_reflect',    'name': 'Thorned Buckler',     'tier': 1, 'cost': 100,
+     'desc': 'Blocked damage is returned to the attacker.'},
+    {'id': 'block_atk_buff',   'name': "Guardian's Edge",     'tier': 1, 'cost': 100,
+     'desc': 'Blocking an enemy attack increases your attack damage by 5 for 2s.'},
+    # Life Steal
+    {'id': 'lifesteal_spell',  'name': 'Siphon Stone',        'tier': 1, 'cost': 100,
+     'desc': 'Lifesteal now also applies to spell damage.'},
+    {'id': 'lifesteal_5pct',   'name': 'Vampiric Pendant',    'tier': 1, 'cost': 100,
+     'desc': '+5% permanent lifesteal.'},
+    {'id': 'heal_on_attack',   'name': 'Bloodbond Hilt',      'tier': 1, 'cost': 100,
+     'desc': 'Heal 3 HP on every attack hit.'},
+
+    # ── Tier 2 — second and third pre-boss shops ───────────────────────────
+    # Attack DMG
+    {'id': 'atk_execute',      'name': 'Finishing Blade',     'tier': 2, 'cost': 100,
+     'desc': '+15 attack damage when the enemy is below 20% HP.'},
+    {'id': 'armor_pen',        'name': 'Armor Shredder',      'tier': 2, 'cost': 100,
+     'desc': 'Your attacks ignore all enemy armor.'},
+    # Attack Speed
+    {'id': 'berserker',        'name': 'Berserker Band',      'tier': 2, 'cost': 100,
+     'desc': 'Gain 20% attack speed when below 50% HP.'},
+    {'id': 'crit_to_aspeed',   'name': 'Swiftcrit Rune',      'tier': 2, 'cost': 100,
+     'desc': 'Future crit upgrades convert to attack speed instead.'},
+    # Crit
+    {'id': 'crit_freeze',      'name': 'Frostcrit Gem',       'tier': 2, 'cost': 100,
+     'desc': 'Crits freeze the enemy, slowing their attack speed by 50% for 2s.'},
+    {'id': 'crit_lifesteal',   'name': 'Crimson Fang',        'tier': 2, 'cost': 100,
+     'desc': 'Crits heal for the bonus crit damage. Disables normal lifesteal.'},
+    # Armor
+    {'id': 'armor_to_spell',   'name': 'Arcane Dissolution',  'tier': 2, 'cost': 100,
+     'desc': 'Remove all your armor and gain that much as spell levels (5% → 1 level).'},
+    # Health
+    {'id': 'hp_to_atk',        'name': 'Bloodprice Sigil',    'tier': 2, 'cost': 100,
+     'desc': 'Gain attack equal to 5% of your max HP.'},
+    {'id': 'hp_double_armor',  'name': 'Ironflesh Pact',      'tier': 2, 'cost': 100,
+     'desc': 'Double your max HP and gain -30% armor.'},
+    # Research
+    {'id': 'research_2slots',  'name': "Scholar's Tome",      'tier': 2, 'cost': 100,
+     'desc': 'Gain 2 item slots and 2 free item credits.'},
+    # Summon
+    {'id': 'summon_upgrade',   'name': "Summoner's Codex",    'tier': 2, 'cost': 100,
+     'desc': 'Upgrade summon abilities: enrage at 35% HP, spell vamp 15%, dragon aura 10%.'},
+    # Spell
+    {'id': 'spell_fire',       'name': 'Flame Rune',          'tier': 2, 'cost': 100,
+     'desc': 'Your spell burns enemies for 10% of spell damage per second over 3s.'},
+    {'id': 'spell_frost',      'name': 'Frost Staff',         'tier': 2, 'cost': 100,
+     'desc': 'Your spell slows enemy attack speed by 50% for 3s.'},
+    {'id': 'spell_heal_summon','name': 'Life Conduit',        'tier': 2, 'cost': 100,
+     'desc': 'Your spell heals your summon instead of damaging (1 heal per 2 spell dmg).'},
+    # Block
+    {'id': 'armor_to_block',   'name': 'Shield Conversion',   'tier': 2, 'cost': 100,
+     'desc': 'Convert all armor to block (1% armor → 0.5% block).'},
 ]
 
 # Two fixed forge menus — one per boss beaten (level 1 boss → index 0, level 2 boss → index 1).
@@ -267,6 +288,12 @@ class PlayerStats:
     has_risky_die: bool  = False  # one die shows 1/2/3/10/11/12
     loaded_high: bool    = False  # all d6s weighted 3× toward 4/5/6
     has_free_reroll: bool = False # free reroll on first roll of each upgrade turn
+    # Item passive flags
+    has_shop_free_reroll: bool = False  # each future shop/forge gets 1 free reroll
+    has_item_discount: bool    = False  # items cost 20% less
+    has_crit_to_aspeed: bool   = False  # crit upgrades convert to atk speed
+    has_armor_gives_hp: bool   = False  # armor upgrades also give HP (1% → 2 HP)
+    has_gold_level_bonus: bool = False  # gold upgrades give +5 extra gold
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -300,8 +327,8 @@ def get_dark_multiplier(hit_count: int, dark_level: int) -> float:
     """
     if dark_level == 0 or hit_count == 0:
         return 1.0
-    tier2 = max(3, 20 - dark_level)
-    tier3 = max(8, 50 - dark_level * 2)
+    tier2 = max(3, 15 - dark_level)
+    tier3 = max(8, 30 - dark_level * 2)
     if hit_count < tier2:
         bonus_pct = 10 + dark_level
     elif hit_count < tier3:
@@ -360,13 +387,19 @@ def apply_upgrades(player: PlayerStats, collections: dict,
 
         # Normal stats — threshold scales proportionally with target
         per_die = defn['per_die']
+
+        # Crit-to-speed: if player has this item, crit upgrades become atk speed
+        if attr == 'crit_chance' and getattr(player, 'has_crit_to_aspeed', False):
+            attr = 'attack_speed'
+            per_die = STAT_DEFS[1]['per_die']   # use atk_speed per_die
+
         gained = per_die * count
         threshold_bonus = False
 
         base_threshold = 3 if num >= 10 else 4
         threshold_at = max(1, int(base_threshold * target / 6 + 0.5)) if target != 6 else base_threshold
         if defn['has_threshold'] and count >= threshold_at:
-            gained += defn['threshold']
+            gained += STAT_DEFS[1]['threshold'] if attr == 'attack_speed' and defn['attr'] == 'crit_chance' else defn['threshold']
             threshold_bonus = True
 
         # Apply
@@ -394,6 +427,27 @@ def apply_upgrades(player: PlayerStats, collections: dict,
             'desc': _upgrade_desc(attr, gained, threshold_bonus),
         })
 
+        # Armor gives HP bonus (item: armor_hp_ratio — 1% armor → 2 HP)
+        if attr == 'armor' and getattr(player, 'has_armor_gives_hp', False):
+            hp_gain = int(gained * 200)   # 0.01 armor = 2 HP → 0.01 * 200 = 2
+            if hp_gain > 0:
+                player.max_hp += hp_gain
+                player.current_hp = min(player.max_hp, player.current_hp + hp_gain)
+                events.append({
+                    'number': num, 'stat': 'max_hp', 'gained': hp_gain,
+                    'threshold_bonus': False,
+                    'desc': f'+{hp_gain} max HP (armor bonus)',
+                })
+
+        # Gold level bonus (item: gold_level_bonus — +5 extra gold per upgrade)
+        if attr == 'gold' and getattr(player, 'has_gold_level_bonus', False):
+            player.gold += 5
+            events.append({
+                'number': num, 'stat': 'gold', 'gained': 5,
+                'threshold_bonus': False,
+                'desc': '+5 gold (level bonus)',
+            })
+
     return events
 
 
@@ -419,55 +473,80 @@ def _upgrade_desc(attr: str, gained: float, threshold: bool) -> str:
 # Combat simulation
 # ---------------------------------------------------------------------------
 
-def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict:
+def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
+                    summon_hp_start: int = None) -> dict:
     """
     Event-driven combat simulation. Returns:
         result:              'win' | 'lose'
         player_hp_remaining: int
+        summon_hp_remaining: int
         events:              list of timed events for frontend animation
     """
     rng = random.Random()
 
     # Item flags
     item_ids = {i['id'] for i in owned_items}
-    has_vampiric_tome  = 'vampiric_tome'   in item_ids
-    has_thorns_vest    = 'thorns_vest'     in item_ids
-    has_battle_drum    = 'battle_drum'     in item_ids
-    has_focusing_lens  = 'focusing_lens'   in item_ids
-    has_lucky_charm    = 'lucky_charm'     in item_ids
-    has_iron_gauntlets = 'iron_gauntlets'  in item_ids
-    has_mana_surge     = 'mana_surge'      in item_ids
-    has_ancient_shield = 'ancient_shield'  in item_ids
-    has_battle_horn    = 'battle_horn'     in item_ids
-    has_phoenix_feather= 'phoenix_feather' in item_ids
+    # Tier 1 combat items
+    has_triple_hit       = 'triple_hit'      in item_ids
+    has_crit_125         = 'crit_125'        in item_ids
+    has_block_reflect    = 'block_reflect'   in item_ids
+    has_block_atk_buff   = 'block_atk_buff'  in item_ids
+    has_lifesteal_spell  = 'lifesteal_spell' in item_ids
+    has_heal_on_attack   = 'heal_on_attack'  in item_ids
+    has_bounty_50g       = 'bounty_50g'      in item_ids
+    # Tier 2 combat items
+    has_atk_execute      = 'atk_execute'     in item_ids
+    has_armor_pen        = 'armor_pen'       in item_ids
+    has_berserker        = 'berserker'       in item_ids
+    has_crit_freeze      = 'crit_freeze'     in item_ids
+    has_crit_lifesteal   = 'crit_lifesteal'  in item_ids
+    has_summon_upgrade   = 'summon_upgrade'  in item_ids
+    has_spell_fire       = 'spell_fire'      in item_ids
+    has_spell_frost      = 'spell_frost'     in item_ids
+    has_spell_heal_summon= 'spell_heal_summon' in item_ids
 
-    spell_cooldown = 2.5 if has_focusing_lens else 4.0
+    spell_cooldown = 4.0
 
     # Enemy special properties
     enemy_armor    = enemy.get('armor',    0.0)
     enemy_regen    = enemy.get('regen',    0)
     enemy_lifesteal= enemy.get('lifesteal',0.0)
+    # Armor Pen: ignore all enemy armor
+    eff_enemy_armor = 0.0 if has_armor_pen else enemy_armor
 
-    # Item-modified combat stats (applied locally, not mutating player)
-    eff_crit    = player.crit_chance + (0.05 if has_lucky_charm    else 0)
-    eff_dmg     = player.attack_dmg  + (8    if has_iron_gauntlets else 0)
-    eff_armor   = min(0.90, player.armor + (0.10 if has_ancient_shield else 0))
-    eff_aspeed  = min(ATTACK_SPEED_CAP, player.attack_speed + (0.1 if has_battle_horn else 0))  # attacks/s
+    # Combat stats
+    eff_crit    = player.crit_chance
+    eff_dmg     = player.attack_dmg
+    eff_armor   = min(0.90, player.armor)
+    eff_aspeed  = min(ATTACK_SPEED_CAP, player.attack_speed)   # attacks/s
     atk_cd      = round(1.0 / eff_aspeed, 4)   # cooldown derived from attacks/s
-    phoenix_used = [False]
+
+    # Summon upgrade item modifies summon special abilities
+    if has_summon_upgrade and summon:
+        summon = dict(summon)
+        if summon.get('enrage_below') is not None:
+            summon['enrage_below'] = 0.35
+        if summon.get('spell_vamp') is not None:
+            summon['spell_vamp'] = 0.15
+        if summon.get('dragon_aura') is not None:
+            summon['dragon_aura'] = 0.10
 
     # Mutable state (use lists to allow mutation inside nested functions)
     player_hp  = [player.current_hp]
     enemy_hp   = [enemy['hp']]
 
     summon     = get_summon_stats(player.summon_level)
-    if summon and has_battle_drum:
-        summon = dict(summon)
-        summon['speed'] = round(summon['speed'] * 0.75, 3)  # 25% faster
-    summon_hp  = [summon['hp'] if summon else 0]
+    start_hp   = summon['hp'] if summon else 0
+    if summon_hp_start is not None and summon:
+        start_hp = min(summon_hp_start, summon['hp'])
+    summon_hp  = [start_hp]
     summon_alive = [summon is not None]
 
-    hit_count = [0]   # player hits landed (for dark vulnerability)
+    hit_count       = [0]    # player hits landed (for dark vulnerability)
+    atk_consecutive = [0]   # attack streak counter (triple_strike)
+    frost_until     = [0.0] # enemy slowed until this time (frost_staff / ice_strike)
+    guard_buff_until= [0.0] # player guard buff until this time (guard_oath)
+
     events    = []
     counter   = [0]
     queue     = []
@@ -493,60 +572,164 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
         if t > MAX_TIME:
             break
 
+        aura_mult = (1 + summon['dragon_aura']) if (summon_alive[0] and summon and summon.get('dragon_aura')) else 1.0
+
         if etype == 'player_attack':
-            dmg = eff_dmg
+            # Berserker: +20% attack speed when below 50% HP
+            if has_berserker and player_hp[0] < player.max_hp * 0.5:
+                effective_aspeed = min(ATTACK_SPEED_CAP, eff_aspeed * 1.20)
+                current_atk_cd = round(1.0 / effective_aspeed, 4)
+            else:
+                current_atk_cd = atk_cd
+
+            # Block atk buff: +5 dmg for 2s after blocking
+            guard_bonus = 5 if (has_block_atk_buff and t <= guard_buff_until[0]) else 0
+            dmg = eff_dmg + guard_bonus
+            # Execute: +15 dmg when enemy below 20% HP
+            is_execute = has_atk_execute and enemy_hp[0] < enemy['hp'] * 0.20
+            if is_execute:
+                dmg += 15
+
             crit = rng.random() < eff_crit
+            crit_mult = 2.25 if has_crit_125 else 2.0
             if crit:
-                dmg = dmg * 2
+                dmg = int(dmg * crit_mult)
+
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-            dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
+            dmg = max(1, int(dmg * dark_mult * aura_mult * (1 - eff_enemy_armor)))
             hit_count[0] += 1
+            atk_consecutive[0] += 1
 
             heal = 0
-            if player.lifesteal > 0:
-                heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
-                player_hp[0] += heal
+            if crit and has_crit_lifesteal:
+                # Crit lifesteal: heal for the bonus crit damage; disables normal lifesteal
+                base_dmg = max(1, int((eff_dmg + guard_bonus + (15 if is_execute else 0))
+                                      * dark_mult * aura_mult * (1 - eff_enemy_armor)))
+                crit_bonus = dmg - base_dmg
+                crit_ls_heal = min(crit_bonus, player.max_hp - player_hp[0])
+                if crit_ls_heal > 0:
+                    player_hp[0] += crit_ls_heal
+                    heal += crit_ls_heal
+            elif player.lifesteal > 0:
+                ls_heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
+                player_hp[0] += ls_heal
+                heal += ls_heal
+            if has_heal_on_attack:
+                atk_heal = min(3, player.max_hp - player_hp[0])
+                player_hp[0] += atk_heal
+                heal += atk_heal
 
             enemy_hp[0] = max(0, enemy_hp[0] - dmg)
-            events.append({
+            ev = {
                 'time': t, 'type': 'player_attack',
                 'dmg': dmg, 'crit': crit, 'heal': heal,
                 'dark_mult': round(dark_mult, 2),
                 'hit_count': hit_count[0],
                 'enemy_hp': enemy_hp[0], 'player_hp': player_hp[0],
-            })
+            }
+            if is_execute:
+                ev['execute'] = True
+            events.append(ev)
+
+            # Crit freeze: slow enemy 50% for 2s on crit
+            if crit and has_crit_freeze and enemy_hp[0] > 0:
+                frost_until[0] = max(frost_until[0], t + 2.0)
+
+            # Triple hit: every 3rd attack deals additional 20 dmg
+            if has_triple_hit and atk_consecutive[0] % 3 == 0 and enemy_hp[0] > 0:
+                bonus_dmg = 20
+                enemy_hp[0] = max(0, enemy_hp[0] - bonus_dmg)
+                events.append({
+                    'time': t, 'type': 'player_attack',
+                    'dmg': bonus_dmg, 'crit': False, 'heal': 0,
+                    'dark_mult': round(dark_mult, 2),
+                    'hit_count': hit_count[0],
+                    'enemy_hp': enemy_hp[0], 'player_hp': player_hp[0],
+                    'triple_hit': True,
+                })
+
             if enemy_hp[0] > 0:
-                push(t + atk_cd, 'player_attack')
+                push(t + current_atk_cd, 'player_attack')
 
         elif etype == 'spell':
-            dmg = 17 + 3 * player.spell_level + (10 if has_mana_surge else 0)
+            base_spell_dmg = 17 + 3 * player.spell_level
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-            dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
+
             heal = 0
-            if has_vampiric_tome:
-                heal = min(int(dmg * 0.30), player.max_hp - player_hp[0])
-                player_hp[0] += heal
+            if has_spell_heal_summon and summon_alive[0] and summon:
+                # Spell heals summon instead of damaging enemy (1 heal per 2 spell dmg)
+                summon_heal = int(base_spell_dmg / 2)
+                summon_hp[0] = min(summon['hp'], summon_hp[0] + summon_heal)
+                ev = {
+                    'time': t, 'type': 'spell',
+                    'dmg': 0, 'heal': 0, 'dark_mult': 1.0,
+                    'enemy_hp': enemy_hp[0], 'player_hp': player_hp[0],
+                    'summon_heal': summon_heal, 'summon_hp': summon_hp[0],
+                }
+                events.append(ev)
+                if enemy_hp[0] > 0:
+                    push(t + spell_cooldown, 'spell')
+                continue
+
+            dmg = max(1, int(base_spell_dmg * dark_mult * aura_mult))
+            # Spell vamp from Skeleton/Dragon
+            if summon_alive[0] and summon and summon.get('spell_vamp', 0) > 0:
+                sv = min(int(dmg * summon['spell_vamp']), player.max_hp - player_hp[0])
+                if sv > 0:
+                    player_hp[0] += sv
+                    heal += sv
+            # Lifesteal spell item: lifesteal applies to spell damage
+            if has_lifesteal_spell and player.lifesteal > 0:
+                siphon_heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
+                if siphon_heal > 0:
+                    player_hp[0] += siphon_heal
+                    heal += siphon_heal
+
             enemy_hp[0] = max(0, enemy_hp[0] - dmg)
-            events.append({
+            ev = {
                 'time': t, 'type': 'spell',
                 'dmg': dmg, 'heal': heal, 'dark_mult': round(dark_mult, 2),
                 'enemy_hp': enemy_hp[0], 'player_hp': player_hp[0],
-            })
+            }
+            # Spell Frost: slow enemy 50% for 3s
+            if has_spell_frost and enemy_hp[0] > 0:
+                frost_until[0] = max(frost_until[0], t + 3.0)
+                ev['frost'] = True
+            # Spell Fire: burn for 10% spell dmg/s over 3s
+            if has_spell_fire and enemy_hp[0] > 0:
+                burn_dmg = max(1, int(base_spell_dmg * 0.10))
+                for tick in range(1, 4):
+                    push(t + tick, 'burn_tick', {'dmg': burn_dmg})
+                ev['burn_applied'] = True
+            events.append(ev)
             if enemy_hp[0] > 0:
                 push(t + spell_cooldown, 'spell')
+
+        elif etype == 'burn_tick':
+            if enemy_hp[0] > 0:
+                bdmg = _data.get('dmg', 5)
+                enemy_hp[0] = max(0, enemy_hp[0] - bdmg)
+                events.append({
+                    'time': t, 'type': 'burn_tick',
+                    'dmg': bdmg, 'enemy_hp': enemy_hp[0],
+                })
 
         elif etype == 'summon_attack':
             if summon_alive[0]:
                 dmg = summon['attack']
                 dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-                dmg = max(1, int(dmg * dark_mult * (1 - enemy_armor)))
+                dmg = max(1, int(dmg * dark_mult))
                 enemy_hp[0] = max(0, enemy_hp[0] - dmg)
+                enraged = (summon.get('enrage_below') is not None and
+                           summon_hp[0] < summon['hp'] * summon['enrage_below'])
+                next_speed = 1.0 if enraged else summon['speed']
                 events.append({
                     'time': t, 'type': 'summon_attack',
-                    'dmg': dmg, 'dark_mult': round(dark_mult, 2), 'enemy_hp': enemy_hp[0],
+                    'dmg': dmg, 'dark_mult': round(dark_mult, 2),
+                    'enemy_hp': enemy_hp[0], 'enraged': enraged,
                 })
                 if enemy_hp[0] > 0:
-                    push(t + summon['speed'], 'summon_attack')
+                    push(t + next_speed, 'summon_attack')
 
         elif etype == 'enemy_regen':
             heal = min(enemy_regen, enemy['hp'] - enemy_hp[0])
@@ -565,24 +748,32 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
 
             if blocked:
                 ev['player_hp'] = player_hp[0]
+                # Block reflect: return blocked damage to attacker
+                if has_block_reflect and enemy_hp[0] > 0:
+                    thorns = enemy['attack']
+                    enemy_hp[0] = max(0, enemy_hp[0] - thorns)
+                    ev['thorns'] = thorns
+                    ev['enemy_hp'] = enemy_hp[0]
+                # Block atk buff: +5 dmg for 2s
+                if has_block_atk_buff:
+                    guard_buff_until[0] = t + 2.0
+            elif summon_alive[0]:
+                # Summon tanks all damage — player takes nothing
+                raw = enemy['attack']
+                summon_hp[0] = max(0, summon_hp[0] - raw)
+                ev['summon_dmg'] = raw
+                ev['summon_hp']  = summon_hp[0]
+                ev['player_hp']  = player_hp[0]
+                if summon_hp[0] <= 0:
+                    summon_alive[0] = False
+                    ev['summon_died'] = True
             else:
                 raw  = enemy['attack']
                 dmg_to_player = max(1, int(raw * (1 - eff_armor)))
                 new_hp = player_hp[0] - dmg_to_player
-                if new_hp <= 0 and has_phoenix_feather and not phoenix_used[0]:
-                    new_hp = 1
-                    phoenix_used[0] = True
-                    ev['phoenix'] = True
                 player_hp[0] = max(0, new_hp)
                 ev['dmg']       = dmg_to_player
                 ev['player_hp'] = player_hp[0]
-
-                # Thorns
-                if has_thorns_vest and enemy_hp[0] > 0:
-                    thorns = 3
-                    enemy_hp[0] = max(0, enemy_hp[0] - thorns)
-                    ev['thorns'] = thorns
-                    ev['enemy_hp'] = enemy_hp[0]
 
                 # Enemy lifesteal — heals enemy when it hits
                 if enemy_lifesteal > 0 and enemy_hp[0] > 0:
@@ -592,18 +783,13 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
                         ev['enemy_lifesteal_heal'] = ls_heal
                         ev['enemy_hp'] = enemy_hp[0]
 
-                # Summon also takes damage
-                if summon_alive[0]:
-                    summon_hp[0] = max(0, summon_hp[0] - raw)
-                    ev['summon_dmg'] = raw
-                    ev['summon_hp']  = summon_hp[0]
-                    if summon_hp[0] <= 0:
-                        summon_alive[0] = False
-                        ev['summon_died'] = True
-
             events.append(ev)
             if player_hp[0] > 0 and enemy_hp[0] > 0:
-                push(t + enemy['speed'], 'enemy_attack')
+                # Frost slow: extend enemy attack interval if slowed
+                next_atk_delay = enemy['speed']
+                if frost_until[0] > t:
+                    next_atk_delay = round(enemy['speed'] / 0.7, 4)  # 30% slower
+                push(t + next_atk_delay, 'enemy_attack')
 
     result = 'win' if enemy_hp[0] <= 0 else 'lose'
     events.append({
@@ -617,6 +803,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list) -> dict
     return {
         'result': result,
         'player_hp_remaining': player_hp[0],
+        'summon_hp_remaining': summon_hp[0] if summon_alive[0] else 0,
         'events': events,
     }
 
@@ -630,9 +817,13 @@ HEAL_POTION = {
 }
 
 
-def generate_shop_items() -> list:
-    """Return 3 random items + the always-available Heal Potion."""
-    items = random.sample(SHOP_ITEMS, min(3, len(SHOP_ITEMS)))
+def generate_shop_items(level_idx: int = 0, discount: bool = False) -> list:
+    """Return 3 random tier-appropriate items + the always-available Heal Potion."""
+    tier = 1 if level_idx == 0 else 2
+    pool = [i for i in SHOP_ITEMS if i['tier'] == tier]
+    items = random.sample(pool, min(3, len(pool)))
+    if discount:
+        items = [{**i, 'cost': int(i['cost'] * 0.8)} for i in items]
     return [HEAL_POTION] + items
 
 
@@ -847,6 +1038,8 @@ class RPGRun:
         self.owned_items          = []
         self.forge_choices        = []
         self.free_reroll_available = False
+        self._summon_hp_carry: int = None   # summon_survive carry-over
+        self._shop_reroll_used: bool = False  # shop_free_reroll used this shop
         # History tracking
         self.total_collections: dict = {n: 0 for n in range(1, 13)}
         self.forge_history: list     = []   # list of chosen forge IDs in order
@@ -920,8 +1113,31 @@ class RPGRun:
 
     def run_combat(self) -> dict:
         """Simulate the fight, update player HP, advance phase."""
-        combat = simulate_combat(self.player, self.current_enemy, self.owned_items)
+        item_ids = {i['id'] for i in self.owned_items}
+        has_bounty_50g  = 'bounty_50g'      in item_ids
+        has_summon_survive = 'summon_survive' in item_ids
+
+        summon_hp_start = None
+        if has_summon_survive and getattr(self, '_summon_hp_carry', None):
+            summon_hp_start = self._summon_hp_carry
+
+        combat = simulate_combat(self.player, self.current_enemy, self.owned_items, summon_hp_start)
         self.last_combat = combat
+
+        # Bounty Token: gain 50 gold on kill
+        if has_bounty_50g and combat['result'] == 'win':
+            self.player.gold += 50
+
+        # Summon survive: carry summon HP and gain 1 level on win
+        if has_summon_survive:
+            remaining = combat.get('summon_hp_remaining', 0)
+            if remaining > 0 and combat['result'] == 'win':
+                self._summon_hp_carry = remaining
+                self.player.summon_level += 1
+            else:
+                self._summon_hp_carry = None
+        else:
+            self._summon_hp_carry = None
 
         if combat['result'] == 'lose':
             self.phase = 'game_over'
@@ -939,7 +1155,8 @@ class RPGRun:
                 next_enemy = LEVELS[self.level_idx]['enemies'][self.fight_idx]
                 if next_enemy['is_boss']:
                     # Pre-boss shop replaces upgrade before the boss
-                    self.shop_items = generate_shop_items()
+                    self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount)
+                    self._shop_reroll_used = False
                     self.phase = 'pre_boss_shop'
                 else:
                     self.phase = 'upgrade'
@@ -965,7 +1182,6 @@ class RPGRun:
             heal = missing // 2
             self.player.current_hp += heal
             self.player.gold -= item['cost']
-            self.shop_items = [i for i in self.shop_items if i['id'] != 'heal_potion']
             return True, 'ok'
 
         if len(self.owned_items) >= max(1, self.player.item_slots):
@@ -980,6 +1196,45 @@ class RPGRun:
                 return False, 'not enough gold'
             self.player.gold -= item['cost']
 
+        # Apply immediate stat effects on purchase
+        iid = item['id']
+        p = self.player
+        if iid == 'atk_flat':
+            p.attack_dmg += 5
+        elif iid == 'armor_flat':
+            p.armor = round(min(0.90, p.armor + 0.10), 4)
+        elif iid == 'lifesteal_5pct':
+            p.lifesteal = round(p.lifesteal + 0.05, 4)
+        elif iid == 'shop_free_reroll':
+            p.has_shop_free_reroll = True
+            self._shop_reroll_used = False
+        elif iid == 'item_discount':
+            p.has_item_discount = True
+        elif iid == 'armor_hp_ratio':
+            p.has_armor_gives_hp = True
+        elif iid == 'gold_level_bonus':
+            p.has_gold_level_bonus = True
+        elif iid == 'crit_to_aspeed':
+            p.has_crit_to_aspeed = True
+        elif iid == 'research_2slots':
+            p.item_slots += 2
+            p.free_items += 2
+        elif iid == 'armor_to_spell':
+            spell_gain = int(p.armor / 0.05)
+            p.armor = 0.0
+            p.spell_level += spell_gain
+        elif iid == 'hp_to_atk':
+            p.attack_dmg += int(p.max_hp * 0.05)
+        elif iid == 'hp_double_armor':
+            gain = p.max_hp
+            p.max_hp *= 2
+            p.current_hp = min(p.max_hp, p.current_hp + gain)
+            p.armor = round(max(0.0, p.armor - 0.30), 4)
+        elif iid == 'armor_to_block':
+            block_gain = round(p.armor * 0.5, 4)
+            p.block_chance = round(min(0.95, p.block_chance + block_gain), 4)
+            p.armor = 0.0
+
         self.owned_items.append(item)
         self.shop_items = [i for i in self.shop_items if i['id'] != item_id]
         return True, 'ok'
@@ -987,10 +1242,14 @@ class RPGRun:
     def reroll_shop(self) -> tuple[bool, str]:
         """Spend gold to refresh the 3 non-potion shop items. Cost: 30g."""
         REROLL_COST = 30
-        if self.player.gold < REROLL_COST:
-            return False, 'not enough gold'
-        self.player.gold -= REROLL_COST
-        self.shop_items = generate_shop_items()
+        # Free reroll if player has oracle lens and hasn't used it this shop
+        use_free = self.player.has_shop_free_reroll and not self._shop_reroll_used
+        if not use_free:
+            if self.player.gold < REROLL_COST:
+                return False, 'not enough gold'
+            self.player.gold -= REROLL_COST
+        self._shop_reroll_used = True
+        self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount)
         return True, 'ok'
 
     def close_shop(self):
