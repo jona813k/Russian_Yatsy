@@ -96,18 +96,22 @@ export default function RpgApp({ onBack }) {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
       background: `radial-gradient(ellipse at 50% 0%, #1E0C04 0%, #0F0A04 50%)`,
       fontFamily: "'Cinzel', serif",
       color: C.text,
-      padding: 16,
+      padding: '10px 14px 8px',
     }}>
       {/* Top bar */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 8,
+        flexShrink: 0,
       }}>
         <h2 style={{
           margin: 0,
@@ -163,14 +167,34 @@ export default function RpgApp({ onBack }) {
         </div>
       </div>
 
-      <RunHeader run={run} />
+      {/* RunHeader — fixed */}
+      <div style={{ flexShrink: 0 }}>
+        <RunHeader run={run} />
+      </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        <PlayerPanel player={run.player} ownedItems={run.owned_items} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Main 3-column layout — fills remaining viewport height, each column scrolls internally */}
+      <div style={{
+        flex: 1,
+        overflow: 'hidden',
+        display: 'flex',
+        gap: 12,
+        alignItems: 'flex-start',
+        minHeight: 0,
+      }}>
+        {/* Player panel */}
+        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%', paddingRight: 2 }}>
+          <PlayerPanel player={run.player} ownedItems={run.owned_items} />
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, overflowY: 'auto', height: '100%', minWidth: 0, paddingRight: 4 }}>
           {renderMain()}
         </div>
-        <RunPath run={run} />
+
+        {/* Run path */}
+        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%' }}>
+          <RunPath run={run} />
+        </div>
       </div>
     </div>
   );

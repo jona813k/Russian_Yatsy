@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { rpgApi } from '../../api.js';
 import { C } from '../../theme.js';
 import { Die } from '../ui/Die.jsx';
@@ -93,8 +93,8 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const [rerolling, setRerolling] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
 
-  const yatzyTurn = yatzy?.turns ?? null;
-  useEffect(() => { setStagedDice([]); }, [yatzyTurn]);
+  // No auto-clear on turn change — staged dice persist so the player can see
+  // what they already collected alongside the new roll (see handleCollect).
 
   const dice = yatzy?.dice || [];
   const diceTypes = yatzy?.dice_types || [];
@@ -171,12 +171,22 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       setActionResult(resp.action_result);
       const st = resp.action_result?.state;
       const hasFailed = !!resp.action_result?.info?.failed_dice;
-      if (!hasFailed && st !== 'turn_end' && st !== 'completed_number' && st !== 'won' && st !== 'bonus_turn') {
+
+      if (st === 'completed_number' || st === 'won' || st === 'bonus_turn') {
+        // Number finished — clear staged and start fresh
+        setStagedDice([]);
+      } else if (!hasFailed) {
+        // Mid-turn re-roll: accumulate collected dice into staged area
+        setStagedDice(prev => [...prev, ...justCollected]);
+      } else {
+        // Failed roll (turn_end) — move collected dice to staged so they stay
+        // visible alongside the new roll; do NOT clear them
         setStagedDice(prev => [...prev, ...justCollected]);
       }
+
       if (hasFailed) {
         setFailedDice(resp.action_result.info.failed_dice);
-        setTimeout(() => { setFailedDice(null); onRunUpdate(resp); }, 1500);
+        setTimeout(() => { setFailedDice(null); onRunUpdate(resp); }, 1200);
       } else {
         onRunUpdate(resp);
       }
@@ -201,8 +211,8 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        marginBottom: 14,
-        padding: '8px 14px',
+        marginBottom: 8,
+        padding: '6px 12px',
         background: 'rgba(30,18,8,0.8)',
         border: `1px solid ${C.border}`,
         borderRadius: 6,
@@ -257,8 +267,8 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
         background: `linear-gradient(135deg, #1E1208, #261808)`,
         border: `1px solid ${C.border}`,
         borderRadius: 8,
-        padding: 14,
-        marginBottom: 14,
+        padding: '10px 12px',
+        marginBottom: 10,
       }}>
         <TableBackground />
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -279,71 +289,34 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             <div style={{ flex: 1, height: 1, background: `linear-gradient(270deg, transparent, ${C.border})` }} />
           </div>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            {/* Active dice */}
-            <div style={{ flex: 1 }}>
+          {/* All dice inline — staged (held) first, then active roll */}
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', minHeight: 60 }}>
+            {stagedDice.map((d, i) => (
+              <Die key={`s${i}`} value={d.value} state="setAside" dieType={d.dieType} />
+            ))}
+            {/* Divider between held and active dice */}
+            {stagedDice.length > 0 && (
               <div style={{
-                fontSize: 10,
-                color: C.bronze,
-                fontFamily: "'Cinzel', serif",
-                letterSpacing: 1,
-                marginBottom: 8,
-                textTransform: 'uppercase',
-              }}>
-                Roll
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', minHeight: 60 }}>
-                {dice.map((val, idx) => (
-                  <Die
-                    key={idx}
-                    value={val}
-                    state={getDieState(idx)}
-                    dieType={diceTypes[idx]}
-                    onClick={() => handleDieClick(idx)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Stashed dice */}
-            <div style={{
-              flexShrink: 0,
-              minWidth: 90,
-              opacity: stagedDice.length === 0 ? 0.3 : 1,
-              transition: 'opacity 0.3s',
-            }}>
-              <div style={{
-                fontSize: 10,
-                color: C.muted,
-                fontFamily: "'Cinzel', serif",
-                letterSpacing: 1,
-                marginBottom: 8,
-                textTransform: 'uppercase',
-              }}>
-                Held
-              </div>
-              <div style={{
-                display: 'flex',
-                gap: 6,
-                flexWrap: 'wrap',
-                minHeight: 60,
-                padding: '6px 8px',
-                background: 'rgba(15,10,4,0.5)',
-                border: `1px dashed ${C.borderDim}`,
-                borderRadius: 4,
-              }}>
-                {stagedDice.length === 0
-                  ? <span style={{ color: C.mutedDim, fontSize: 11, alignSelf: 'center', fontFamily: 'monospace' }}>—</span>
-                  : stagedDice.map((d, i) => <Die key={i} value={d.value} state="setAside" dieType={d.dieType} />)
-                }
-              </div>
-            </div>
+                width: 2, height: 42, borderRadius: 1,
+                background: `linear-gradient(180deg, transparent, ${C.border}, transparent)`,
+                flexShrink: 0,
+              }} />
+            )}
+            {dice.map((val, idx) => (
+              <Die
+                key={idx}
+                value={val}
+                state={getDieState(idx)}
+                dieType={diceTypes[idx]}
+                onClick={() => handleDieClick(idx)}
+              />
+            ))}
           </div>
         </div>
       </div>
 
       {/* === ACTIONS === */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         {run.free_reroll_available && !selectedNumber && !hasSkipOnly && (
           <Btn
             color={C.purple}

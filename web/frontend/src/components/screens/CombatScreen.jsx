@@ -315,12 +315,12 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
-          padding: '16px 24px 8px',
-          gap: 12,
+          padding: '10px 16px 6px',
+          gap: 8,
         }}>
           {/* Player side */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <PlayerSprite anim={playerAnim} size={180} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <PlayerSprite anim={playerAnim} size={140} />
             <CharacterCard
               name="Gladiator"
               hp={playerHp}
@@ -332,8 +332,8 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
 
           {/* Summon (if any) */}
           {summon && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <SummonSprite name={summon.name} anim={summonAnim} size={130} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <SummonSprite name={summon.name} anim={summonAnim} size={100} />
               <div style={{
                 background: `rgba(122,58,154,0.15)`,
                 border: `1px solid ${C.purple}`,
@@ -361,7 +361,7 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
             flexDirection: 'column',
             alignItems: 'center',
             gap: 6,
-            paddingBottom: 60,
+            paddingBottom: 40,
           }}>
             <div style={{
               color: C.crimson,
@@ -389,11 +389,11 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
           </div>
 
           {/* Enemy side */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <EnemySprite
               name={enemy?.name ?? 'Human Soldier'}
               anim={enemyAnim}
-              size={180}
+              size={140}
               isBoss={enemy?.is_boss}
             />
             <CharacterCard
@@ -480,7 +480,7 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
             </div>
             <div
               ref={logRef}
-              style={{ padding: 10, maxHeight: 160, overflowY: 'auto' }}
+              style={{ padding: 8, maxHeight: 130, overflowY: 'auto' }}
             >
               {log.length === 0 ? (
                 <div style={{ color: C.muted, fontSize: 12, fontFamily: "'Cinzel', serif" }}>Combat beginning…</div>
