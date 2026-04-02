@@ -1,14 +1,15 @@
 import { C } from '../../theme.js';
 
 const PHASE_LABELS = {
-  upgrade:      (run) => `Prepare — ${run.upgrade_turns_max - run.upgrade_turns_used} turns left`,
-  upgrade_done: () => 'Ready for Battle',
-  combat:       () => 'In the Arena',
+  pre_game_forge: () => 'Choose Your Path',
+  upgrade:       (run) => `Prepare — ${run.upgrade_turns_max - run.upgrade_turns_used} turns left`,
+  upgrade_done:  () => 'Ready for Battle',
+  combat:        () => 'In the Arena',
   pre_boss_shop: () => 'Before the Champion',
-  shop:         () => 'The Marketplace',
-  forge:        () => 'The Forge',
-  game_over:    () => 'Fallen',
-  victory:      () => 'Champion!',
+  shop:          () => 'The Marketplace',
+  forge:         () => 'The Forge',
+  game_over:     () => 'Fallen',
+  victory:       () => 'Champion!',
 };
 
 export function RunHeader({ run }) {

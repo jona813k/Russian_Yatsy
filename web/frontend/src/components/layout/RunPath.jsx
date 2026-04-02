@@ -74,6 +74,10 @@ function PathNode({ node }) {
 
 export function RunPath({ run }) {
   const path = run.path || [];
+  const currentLevel = run.level;
+
+  // Only show nodes for the current level
+  const levelNodes = path.filter(node => node.level === currentLevel);
 
   return (
     <div style={{ minWidth: 140, maxWidth: 155 }}>
@@ -88,33 +92,12 @@ export function RunPath({ run }) {
         borderBottom: `1px solid ${C.borderDim}`,
         paddingBottom: 6,
       }}>
-        Path Ahead
+        Level {currentLevel}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {path.map((node, i) => {
-          const isFirstOfLevel =
-            (node.type === 'upgrade' && node.fight === 0) ||
-            (node.type === 'pre_boss_shop' && node.fight === 0);
-          return (
-            <div key={i}>
-              {isFirstOfLevel && (
-                <div style={{
-                  color: C.mutedDim,
-                  fontSize: 8,
-                  letterSpacing: 2,
-                  padding: '5px 4px 2px',
-                  textTransform: 'uppercase',
-                  fontFamily: "'Cinzel', serif",
-                  borderTop: i > 0 ? `1px solid ${C.borderDim}` : 'none',
-                  marginTop: i > 0 ? 4 : 0,
-                }}>
-                  Level {node.level}
-                </div>
-              )}
-              <PathNode node={node} />
-            </div>
-          );
-        })}
+        {levelNodes.map((node, i) => (
+          <PathNode key={i} node={node} />
+        ))}
       </div>
     </div>
   );

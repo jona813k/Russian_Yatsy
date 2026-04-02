@@ -521,6 +521,12 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
     eff_aspeed  = min(ATTACK_SPEED_CAP, player.attack_speed)   # attacks/s
     atk_cd      = round(1.0 / eff_aspeed, 4)   # cooldown derived from attacks/s
 
+    # Mutable state (use lists to allow mutation inside nested functions)
+    player_hp  = [player.current_hp]
+    enemy_hp   = [enemy['hp']]
+
+    summon     = get_summon_stats(player.summon_level)
+
     # Summon upgrade item modifies summon special abilities
     if has_summon_upgrade and summon:
         summon = dict(summon)
@@ -531,11 +537,6 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
         if summon.get('dragon_aura') is not None:
             summon['dragon_aura'] = 0.10
 
-    # Mutable state (use lists to allow mutation inside nested functions)
-    player_hp  = [player.current_hp]
-    enemy_hp   = [enemy['hp']]
-
-    summon     = get_summon_stats(player.summon_level)
     start_hp   = summon['hp'] if summon else 0
     if summon_hp_start is not None and summon:
         start_hp = min(summon_hp_start, summon['hp'])

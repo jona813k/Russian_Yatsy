@@ -88,7 +88,7 @@ function TableBackground() {
 export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const yatzy = run.yatzy;
   const [selectedIndices, setSelectedIndices] = useState([]);
-  const [failedDice, setFailedDice] = useState(null);
+  const [failedDiceDisplay, setFailedDiceDisplay] = useState(null); // shows in prep table as illegal
   const [actionResult, setActionResult] = useState(null);
   const [rerolling, setRerolling] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
@@ -185,8 +185,8 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       }
 
       if (hasFailed) {
-        setFailedDice(resp.action_result.info.failed_dice);
-        setTimeout(() => { setFailedDice(null); onRunUpdate(resp); }, 1200);
+        setFailedDiceDisplay(resp.action_result.info.failed_dice);
+        setTimeout(() => { setFailedDiceDisplay(null); setStagedDice([]); onRunUpdate(resp); }, 1200);
       } else {
         onRunUpdate(resp);
       }
@@ -240,27 +240,6 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
         </span>
       </div>
 
-      {/* === FAILED DICE NOTICE === */}
-      {failedDice && (
-        <div style={{
-          background: 'rgba(155,26,26,0.15)',
-          border: `1px solid ${C.crimson}`,
-          borderRadius: 6,
-          padding: '8px 12px',
-          marginBottom: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
-          <span style={{ color: C.scarlet, fontSize: 12, fontFamily: "'Cinzel', serif" }}>
-            No match —
-          </span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {failedDice.map((v, i) => <Die key={i} value={v} state="illegal" />)}
-          </div>
-        </div>
-      )}
-
       {/* === WAR TABLE (dice area) === */}
       <div style={{
         position: 'relative',
@@ -289,26 +268,51 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             <div style={{ flex: 1, height: 1, background: `linear-gradient(270deg, transparent, ${C.border})` }} />
           </div>
 
-          {/* All dice inline — staged (held) first, then active roll */}
-          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', minHeight: 60 }}>
-            {stagedDice.map((d, i) => (
-              <Die key={`s${i}`} value={d.value} state="setAside" dieType={d.dieType} />
-            ))}
-            {/* Divider between held and active dice */}
+          {/* Stash row — fixed height, always rendered to prevent layout shift */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            minHeight: 28,
+            marginBottom: 8,
+            padding: '3px 0',
+          }}>
             {stagedDice.length > 0 && (
-              <div style={{
-                width: 2, height: 42, borderRadius: 1,
-                background: `linear-gradient(180deg, transparent, ${C.border}, transparent)`,
-                flexShrink: 0,
-              }} />
+              <>
+                <span style={{ color: C.mutedDim, fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', fontFamily: "'Cinzel', serif", flexShrink: 0 }}>
+                  Stash
+                </span>
+                <div style={{ width: 1, height: 16, background: C.borderDim, flexShrink: 0 }} />
+                {stagedDice.map((d, i) => (
+                  <div key={i} style={{
+                    width: 22, height: 22,
+                    borderRadius: 4,
+                    background: 'rgba(92,58,16,0.25)',
+                    border: `1px solid ${C.border}66`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    color: C.muted,
+                    fontFamily: 'monospace',
+                    fontWeight: '600',
+                  }}>
+                    {d.value}
+                  </div>
+                ))}
+              </>
             )}
-            {dice.map((val, idx) => (
+          </div>
+
+          {/* Active dice — shows current roll, or failed dice as illegal while transitioning */}
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center', minHeight: 60 }}>
+            {(failedDiceDisplay || dice).map((val, idx) => (
               <Die
                 key={idx}
                 value={val}
-                state={getDieState(idx)}
-                dieType={diceTypes[idx]}
-                onClick={() => handleDieClick(idx)}
+                state={failedDiceDisplay ? 'illegal' : getDieState(idx)}
+                dieType={failedDiceDisplay ? undefined : diceTypes[idx]}
+                onClick={failedDiceDisplay ? undefined : () => handleDieClick(idx)}
               />
             ))}
           </div>

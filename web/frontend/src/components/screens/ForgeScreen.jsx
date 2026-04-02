@@ -1,69 +1,79 @@
 import { useState } from 'react';
 import { rpgApi } from '../../api.js';
 import { C } from '../../theme.js';
-import { Btn } from '../ui/Btn.jsx';
 
-function ForgeCard({ choice, onPick, loading }) {
+function ForgeRow({ choice, onPick, loading }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{
-        background: hovered
-          ? `linear-gradient(135deg, #200A30, #160820)`
-          : `linear-gradient(135deg, #180828, #0E0618)`,
-        border: `1px solid ${hovered ? C.purple : C.purple + '66'}`,
-        borderRadius: 8,
-        padding: 16,
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 14,
-        transition: 'all 0.15s',
-        boxShadow: hovered ? `0 0 20px rgba(122,58,154,0.2)` : 'none',
-        cursor: 'pointer',
-      }}
       onClick={() => !loading && onPick(choice.id)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '9px 12px',
+        background: hovered ? 'rgba(122,58,154,0.12)' : 'rgba(10,4,20,0.6)',
+        border: `1px solid ${hovered ? C.purple : C.purple + '55'}`,
+        borderRadius: 5,
+        cursor: 'pointer',
+        transition: 'all 0.12s',
+      }}
     >
       {/* Icon */}
-      <div style={{
-        fontSize: 28,
+      <span style={{
+        fontSize: 20,
         lineHeight: 1,
         flexShrink: 0,
-        filter: 'drop-shadow(0 0 6px rgba(192,132,252,0.5))',
+        filter: 'drop-shadow(0 0 4px rgba(192,132,252,0.4))',
       }}>
         {choice.icon}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{
+      </span>
+
+      {/* Name + desc */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
           color: C.yellow,
-          fontWeight: '700',
-          fontSize: 14,
+          fontWeight: '600',
+          fontSize: 12,
           fontFamily: "'Cinzel', serif",
-          marginBottom: 5,
           letterSpacing: 0.5,
         }}>
           {choice.name}
-        </div>
-        <div style={{
+        </span>
+        <span style={{
           color: C.muted,
-          fontSize: 12,
+          fontSize: 11,
           fontFamily: "'Cinzel', serif",
-          marginBottom: 10,
-          lineHeight: 1.5,
-          letterSpacing: 0.3,
+          marginLeft: 8,
         }}>
-          {choice.desc}
-        </div>
-        <Btn
-          onClick={(e) => { e.stopPropagation(); onPick(choice.id); }}
-          disabled={loading}
-          color={C.purple}
-          style={{ fontSize: 12, padding: '6px 16px' }}
-        >
-          Choose
-        </Btn>
+          — {choice.desc}
+        </span>
       </div>
+
+      {/* Button */}
+      <button
+        onClick={e => { e.stopPropagation(); onPick(choice.id); }}
+        disabled={loading}
+        style={{
+          flexShrink: 0,
+          background: hovered ? C.purple : 'rgba(122,58,154,0.4)',
+          color: C.sand,
+          border: `1px solid ${C.purple}`,
+          borderRadius: 4,
+          padding: '4px 12px',
+          fontSize: 11,
+          fontFamily: "'Cinzel', serif",
+          fontWeight: '600',
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          cursor: loading ? 'default' : 'pointer',
+          transition: 'all 0.12s',
+        }}
+      >
+        Choose
+      </button>
     </div>
   );
 }
@@ -82,40 +92,42 @@ export function ForgeScreen({ run, runId, onRunUpdate, onError }) {
   }
 
   return (
-    <div style={{ maxWidth: 500 }}>
+    <div style={{
+      background: `linear-gradient(180deg, #180828, #0E0618)`,
+      border: `1px solid ${C.purple}`,
+      borderRadius: 6,
+      overflow: 'hidden',
+      boxShadow: `0 0 20px rgba(122,58,154,0.15)`,
+    }}>
+      {/* Compact header */}
       <div style={{
-        background: `linear-gradient(180deg, #180828, #0E0618)`,
-        border: `1px solid ${C.purple}`,
-        borderRadius: 8,
-        overflow: 'hidden',
-        boxShadow: `0 0 30px rgba(122,58,154,0.2)`,
+        background: `linear-gradient(90deg, #2A1A40, #1E1030)`,
+        borderBottom: `1px solid ${C.purple}55`,
+        padding: '8px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
       }}>
-        {/* Header */}
-        <div style={{
-          background: `linear-gradient(90deg, #2A1A40, #1E1030)`,
-          borderBottom: `1px solid ${C.purple}66`,
-          padding: '14px 18px',
+        <span style={{ color: C.purple, fontSize: 14 }}>⚒</span>
+        <span style={{
+          color: C.purple,
+          fontWeight: '700',
+          fontSize: 13,
+          fontFamily: "'Cinzel', serif",
+          letterSpacing: 1,
         }}>
-          <div style={{
-            color: C.purple,
-            fontWeight: '700',
-            fontSize: 18,
-            fontFamily: "'Cinzel Decorative', serif",
-            letterSpacing: 2,
-            marginBottom: 4,
-          }}>
-            ⚒ The Forge
-          </div>
-          <div style={{ color: C.muted, fontSize: 12, fontFamily: "'Cinzel', serif", letterSpacing: 0.5 }}>
-            The champion has fallen. The forge-master offers you one gift.
-          </div>
-        </div>
+          The Forge
+        </span>
+        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif", marginLeft: 4 }}>
+          — the champion has fallen. Pick one gift.
+        </span>
+      </div>
 
-        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {choices.map(choice => (
-            <ForgeCard key={choice.id} choice={choice} onPick={pick} loading={loading} />
-          ))}
-        </div>
+      {/* Choice rows */}
+      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {choices.map(choice => (
+          <ForgeRow key={choice.id} choice={choice} onPick={pick} loading={loading} />
+        ))}
       </div>
     </div>
   );

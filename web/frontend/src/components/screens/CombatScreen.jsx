@@ -109,55 +109,53 @@ function ArenaBackground() {
   );
 }
 
-function CharacterCard({ name, hp, maxHp, alive, isBoss, isPlayer, summonName }) {
+function CharacterCard({ name, hp, maxHp, alive, isBoss, isPlayer, _accentColor }) {
   const hpColor = alive
     ? (hp / maxHp > 0.6 ? C.hpHigh : hp / maxHp > 0.3 ? C.hpMid : C.hpLow)
     : '#444';
-  const borderColor = !alive ? C.borderDim : isPlayer ? C.bronze : isBoss ? C.scarlet : C.crimson;
+  const borderColor = !alive ? C.borderDim : _accentColor ?? (isPlayer ? C.bronze : isBoss ? C.scarlet : C.crimson);
 
   return (
     <div style={{
       background: `linear-gradient(180deg, rgba(30,18,8,0.9) 0%, rgba(15,10,4,0.95) 100%)`,
       border: `1px solid ${borderColor}`,
       borderRadius: 6,
-      padding: '8px 12px',
-      minWidth: 120,
+      padding: '6px 10px',
+      minWidth: 110,
       textAlign: 'center',
       opacity: alive ? 1 : 0.5,
       transition: 'opacity 0.4s, border-color 0.3s',
       boxShadow: isBoss && alive ? `0 0 15px rgba(220,32,32,0.3)` : 'none',
     }}>
-      <div style={{
-        fontSize: 9,
-        color: C.muted,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-        fontFamily: "'Cinzel', serif",
-        marginBottom: 4,
-      }}>
-        {isPlayer ? 'You' : isBoss ? '⚠ Champion' : 'Enemy'}
+      <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, textTransform: 'uppercase', fontFamily: "'Cinzel', serif", marginBottom: 3 }}>
+        {_accentColor ? 'Summon' : isPlayer ? 'You' : isBoss ? '⚠ Champion' : 'Enemy'}
       </div>
       <div style={{
-        fontSize: 12,
-        fontWeight: '600',
-        color: alive ? (isPlayer ? C.bronze : isBoss ? C.scarlet : C.textDim) : C.muted,
-        fontFamily: "'Cinzel', serif",
-        marginBottom: 6,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        fontSize: 12, fontWeight: '600',
+        color: alive ? (_accentColor ?? (isPlayer ? C.bronze : isBoss ? C.scarlet : C.textDim)) : C.muted,
+        fontFamily: "'Cinzel', serif", marginBottom: 5,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {alive ? name : `${name} ✝`}
       </div>
       <HPBar current={Math.max(0, hp)} max={maxHp} color={hpColor} />
-      <div style={{
-        fontSize: 10,
-        color: C.muted,
-        marginTop: 3,
-        fontFamily: 'monospace',
-      }}>
+      <div style={{ fontSize: 10, color: C.muted, marginTop: 2, fontFamily: 'monospace' }}>
         {Math.max(0, Math.round(hp))} / {maxHp}
       </div>
+    </div>
+  );
+}
+
+function StatChip({ label, value, color }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 4,
+      background: 'rgba(15,10,4,0.7)',
+      border: `1px solid ${color}44`,
+      borderRadius: 3, padding: '2px 6px',
+    }}>
+      <span style={{ color: C.mutedDim, fontSize: 9, fontFamily: "'Cinzel', serif", letterSpacing: 0.5 }}>{label}</span>
+      <span style={{ color, fontSize: 10, fontFamily: 'monospace', fontWeight: '600' }}>{value}</span>
     </div>
   );
 }
@@ -174,6 +172,7 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
   const [summonAlive, setSummonAlive] = useState(!!summon);
   const [darkStacks, setDarkStacks] = useState({ hitCount: 0, mult: 1.0 });
   const [pendingNext, setPendingNext] = useState(null);
+  const [logOpen, setLogOpen] = useState(false);
 
   // Sprite animation states
   const [playerAnim, setPlayerAnim] = useState('idle');
@@ -315,138 +314,51 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
-          padding: '10px 16px 6px',
+          padding: '10px 16px 10px',
           gap: 8,
         }}>
-          {/* Player side */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <PlayerSprite anim={playerAnim} size={140} />
-            <CharacterCard
-              name="Gladiator"
-              hp={playerHp}
-              maxHp={playerMaxHp}
-              alive={playerHp > 0}
-              isPlayer
-            />
+          {/* ── Player + Summon side ── */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            {/* Player column */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+              <PlayerSprite anim={playerAnim} size={140} />
+              <CharacterCard name="Gladiator" hp={playerHp} maxHp={playerMaxHp} alive={playerHp > 0} isPlayer />
+            </div>
+            {/* Summon column — right next to player */}
+            {summon && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                <SummonSprite name={summon.name} anim={summonAnim} size={140} />
+                <CharacterCard
+                  name={summonAlive ? summon.name : `${summon.name} ✝`}
+                  hp={summonHp}
+                  maxHp={summonMaxHp}
+                  alive={summonAlive}
+                  isPlayer={false}
+                  isBoss={false}
+                  _accentColor={C.purple}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Summon (if any) */}
-          {summon && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <SummonSprite name={summon.name} anim={summonAnim} size={100} />
-              <div style={{
-                background: `rgba(122,58,154,0.15)`,
-                border: `1px solid ${C.purple}`,
-                borderRadius: 6,
-                padding: '6px 10px',
-                textAlign: 'center',
-                minWidth: 90,
-                opacity: summonAlive ? 1 : 0.4,
-              }}>
-                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 3, fontFamily: "'Cinzel', serif" }}>SUMMON</div>
-                <div style={{ fontSize: 11, color: C.purple, fontFamily: "'Cinzel', serif", marginBottom: 4 }}>
-                  {summonAlive ? summon.name : `${summon.name} ✝`}
-                </div>
-                <HPBar current={Math.max(0, summonHp)} max={summonMaxHp} color={C.purple} />
-                <div style={{ fontSize: 9, color: C.muted, marginTop: 2, fontFamily: 'monospace' }}>
-                  {Math.max(0, Math.round(summonHp))} / {summonMaxHp}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* VS */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 6,
-            paddingBottom: 40,
-          }}>
+          {/* ── VS — always centered ── */}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', paddingBottom: 50 }}>
             <div style={{
-              color: C.crimson,
-              fontSize: 14,
-              fontWeight: '700',
-              fontFamily: "'Cinzel Decorative', serif",
-              letterSpacing: 3,
+              color: C.crimson, fontSize: 14, fontWeight: '700',
+              fontFamily: "'Cinzel Decorative', serif", letterSpacing: 3,
               textShadow: `0 0 10px rgba(155,26,26,0.5)`,
             }}>
               VS
             </div>
-            {/* Dark level indicator */}
-            {run.player.dark_level > 0 && darkStacks.hitCount > 0 && (
-              <div style={{
-                background: '#1A0A2A',
-                border: `1px solid #6A2A9A`,
-                borderRadius: 4,
-                padding: '3px 8px',
-                fontSize: 11,
-                color: '#C084FC',
-              }}>
-                Dark ×{darkStacks.mult}
-              </div>
-            )}
           </div>
 
-          {/* Enemy side */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <EnemySprite
-              name={enemy?.name ?? 'Human Soldier'}
-              anim={enemyAnim}
-              size={140}
-              isBoss={enemy?.is_boss}
-            />
+          {/* ── Enemy side ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <EnemySprite name={enemy?.name ?? 'Human Soldier'} anim={enemyAnim} size={140} isBoss={enemy?.is_boss} />
             <CharacterCard
-              name={enemy?.name ?? 'Enemy'}
-              hp={enemyHp}
-              maxHp={enemyMaxHp}
-              alive={enemyHp > 0}
-              isBoss={enemy?.is_boss}
+              name={enemy?.name ?? 'Enemy'} hp={enemyHp} maxHp={enemyMaxHp}
+              alive={enemyHp > 0} isBoss={enemy?.is_boss}
             />
-            {/* Enemy buffs */}
-            {(enemy?.armor > 0 || enemy?.regen > 0 || enemy?.lifesteal > 0) && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {enemy.armor > 0 && (
-                  <span style={{
-                    background: 'rgba(26,42,26,0.8)',
-                    border: '1px solid #3A6A3A',
-                    borderRadius: 3,
-                    padding: '2px 5px',
-                    fontSize: 10,
-                    color: '#6BCF6B',
-                    fontFamily: 'monospace',
-                  }}>
-                    ⚔ {Math.round(enemy.armor * 100)}% armor
-                  </span>
-                )}
-                {enemy.regen > 0 && (
-                  <span style={{
-                    background: 'rgba(26,42,26,0.8)',
-                    border: '1px solid #3A6A3A',
-                    borderRadius: 3,
-                    padding: '2px 5px',
-                    fontSize: 10,
-                    color: '#4ADE80',
-                    fontFamily: 'monospace',
-                  }}>
-                    ♻ {enemy.regen}/s
-                  </span>
-                )}
-                {enemy.lifesteal > 0 && (
-                  <span style={{
-                    background: 'rgba(42,26,26,0.8)',
-                    border: '1px solid #6A1A1A',
-                    borderRadius: 3,
-                    padding: '2px 5px',
-                    fontSize: 10,
-                    color: '#F87171',
-                    fontFamily: 'monospace',
-                  }}>
-                    ♥ {Math.round(enemy.lifesteal * 100)}% lifesteal
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -458,47 +370,57 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
         </div>
       ) : (
         <>
-          {/* Scroll / parchment-style log */}
+          {/* Battle log — collapsed by default */}
           <div style={{
             background: `linear-gradient(180deg, #1A0E06 0%, #130A04 100%)`,
             border: `1px solid ${C.border}`,
             borderRadius: 6,
             overflow: 'hidden',
           }}>
-            {/* Log header */}
-            <div style={{
-              background: `linear-gradient(90deg, #3A1A08, #2A1004)`,
-              borderBottom: `1px solid ${C.border}`,
-              padding: '6px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}>
-              <span style={{ color: C.gold, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', fontFamily: "'Cinzel', serif" }}>
+            {/* Log header / toggle */}
+            <div
+              onClick={() => setLogOpen(o => !o)}
+              style={{
+                background: `linear-gradient(90deg, #3A1A08, #2A1004)`,
+                borderBottom: logOpen ? `1px solid ${C.border}` : 'none',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <span style={{ color: C.gold, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', fontFamily: "'Cinzel', serif", flex: 1 }}>
                 Battle Chronicle
               </span>
-            </div>
-            <div
-              ref={logRef}
-              style={{ padding: 8, maxHeight: 130, overflowY: 'auto' }}
-            >
-              {log.length === 0 ? (
-                <div style={{ color: C.muted, fontSize: 12, fontFamily: "'Cinzel', serif" }}>Combat beginning…</div>
-              ) : (
-                log.map((l, i) => (
-                  <div key={i} style={{
-                    fontSize: 12,
-                    color: getMsgColor(l),
-                    padding: '2px 0',
-                    borderBottom: `1px solid rgba(92,58,16,0.1)`,
-                    fontFamily: "'Cinzel', serif",
-                    letterSpacing: 0.3,
-                  }}>
-                    {l}
-                  </div>
-                ))
+              {log.length > 0 && !logOpen && (
+                <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif" }}>
+                  {log[log.length - 1].slice(0, 40)}{log[log.length - 1].length > 40 ? '…' : ''}
+                </span>
               )}
+              <span style={{ color: C.muted, fontSize: 11 }}>{logOpen ? '▲' : '▼'}</span>
             </div>
+            {logOpen && (
+              <div ref={logRef} style={{ padding: 8, maxHeight: 130, overflowY: 'auto' }}>
+                {log.length === 0 ? (
+                  <div style={{ color: C.muted, fontSize: 12, fontFamily: "'Cinzel', serif" }}>Combat beginning…</div>
+                ) : (
+                  log.map((l, i) => (
+                    <div key={i} style={{
+                      fontSize: 12,
+                      color: getMsgColor(l),
+                      padding: '2px 0',
+                      borderBottom: `1px solid rgba(92,58,16,0.1)`,
+                      fontFamily: "'Cinzel', serif",
+                      letterSpacing: 0.3,
+                    }}>
+                      {l}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {pendingNext && (
