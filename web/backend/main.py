@@ -6,8 +6,6 @@ Endpoints (all JSON):
   POST /api/game/{id}/roll    Roll dice (start of turn)
   POST /api/game/{id}/select  Select a number to collect
   GET  /api/game/{id}/state   Get current game state
-  GET  /api/game/{id}/ai-hint Get AI ranking of all legal moves
-
 Run locally:
     pip install fastapi uvicorn
     uvicorn web.backend.main:app --reload --port 8000
@@ -25,7 +23,6 @@ import json
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,8 +30,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-from src.game.ml_engine import MLGameEngine
-from src.game.dqn_agent_v2 import DQNAgentV2
+from src.game.engine import GameEngine
 from web.backend.rpg_engine import RPGRun
 
 # ---------------------------------------------------------------------------
@@ -74,23 +70,8 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-# ---------------------------------------------------------------------------
-# AI model (loaded once at startup)
-# ---------------------------------------------------------------------------
-
-ai_agent: Optional[DQNAgentV2] = None
-
 @app.on_event("startup")
 async def startup():
-    global ai_agent
-    model_path = Path(__file__).parent.parent.parent / "models" / "dqn_v2_best.pth"
-    if model_path.exists():
-        ai_agent = DQNAgentV2()
-        ai_agent.load(str(model_path))
-        ai_agent.epsilon = 0.0
-        logger.info(f"AI model loaded from {model_path}")
-    else:
-        logger.warning(f"No model at {model_path}. /ai-hint will return empty.")
     asyncio.create_task(_cleanup_loop())
 
 # ---------------------------------------------------------------------------
@@ -99,7 +80,7 @@ async def startup():
 
 SESSION_TTL = timedelta(hours=2)   # idle sessions expire after 2 hours
 
-sessions:  dict[str, tuple[MLGameEngine, datetime]] = {}
+sessions:  dict[str, tuple[GameEngine, datetime]] = {}
 rpg_runs:  dict[str, tuple[RPGRun,       datetime]] = {}
 
 
@@ -120,14 +101,14 @@ async def _cleanup_loop():
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
-def get_session(session_id: str) -> MLGameEngine:
+def get_session(session_id: str) -> GameEngine:
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     engine, _ = sessions[session_id]
     sessions[session_id] = (engine, _now())  # refresh TTL on access
     return engine
 
-def compute_dice_groups(engine: MLGameEngine) -> dict:
+def compute_dice_groups(engine: GameEngine) -> dict:
     """
     For each legal number, return ALL die indices that could potentially
     contribute to collecting that number.
@@ -166,7 +147,7 @@ def compute_dice_groups(engine: MLGameEngine) -> dict:
     return groups
 
 
-def engine_to_state(engine: MLGameEngine) -> dict:
+def engine_to_state(engine: GameEngine) -> dict:
     """Serialise engine state to a JSON-safe dict the frontend can render."""
     info = engine.get_game_info()
     return {
@@ -198,7 +179,7 @@ class SelectRequest(BaseModel):
 def new_game():
     """Create a new game session and return the initial state."""
     session_id = str(uuid.uuid4())
-    engine = MLGameEngine()
+    engine = GameEngine()
     engine.reset()
     sessions[session_id] = (engine, _now())
 
@@ -476,30 +457,3 @@ def rpg_history_clear():
     return {'cleared': True}
 
 
-@app.get("/api/game/{session_id}/ai-hint")
-def ai_hint(session_id: str):
-    """
-    Return all legal moves ranked by the AI's Q-values.
-
-    The frontend uses this to:
-      - Show "AI recommends: 8" before the player picks
-      - After the player picks, show whether it was optimal
-      - Display expected value difference between choices
-    """
-    engine = get_session(session_id)
-
-    if ai_agent is None:
-        return {"available": False, "rankings": []}
-
-    rich_state = engine.get_rich_state()
-    legal = engine.get_legal_actions()
-
-    if not legal:
-        return {"available": True, "rankings": []}
-
-    rankings = ai_agent.get_action_rankings(rich_state, legal)
-    return {
-        "available": True,
-        "best_number": rankings[0]["number"],
-        "rankings": rankings,
-    }
