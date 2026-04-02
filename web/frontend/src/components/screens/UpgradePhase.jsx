@@ -217,14 +217,14 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
         border: `1px solid ${C.border}`,
         borderRadius: 6,
       }}>
-        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>
+        <span style={{ color: C.muted, fontSize: 15, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>
           Turns
         </span>
         <div style={{ display: 'flex', gap: 5 }}>
           {Array.from({ length: run.upgrade_turns_max }, (_, i) => (
             <div key={i} style={{
-              width: 14,
-              height: 14,
+              width: 15,
+              height: 15,
               borderRadius: '50%',
               background: i < turnsRemaining
                 ? `radial-gradient(circle, ${C.gold} 30%, ${C.bronze} 100%)`
@@ -235,7 +235,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             }} />
           ))}
         </div>
-        <span style={{ color: C.gold, fontWeight: '600', fontSize: 13, fontFamily: 'monospace' }}>
+        <span style={{ color: C.gold, fontWeight: '600', fontSize: 16, fontFamily: 'monospace' }}>
           {turnsRemaining}
         </span>
       </div>
