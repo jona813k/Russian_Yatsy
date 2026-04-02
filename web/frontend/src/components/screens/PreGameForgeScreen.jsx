@@ -13,7 +13,8 @@ function SpecRow({ choice, onPick, loading }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        padding: '9px 12px',
+        height: 78,
+        padding: '11px 14px',
         background: hovered ? 'rgba(212,175,55,0.07)' : 'rgba(15,10,4,0.5)',
         border: `1px solid ${hovered ? C.gold : C.border}`,
         borderRadius: 5,
@@ -22,27 +23,28 @@ function SpecRow({ choice, onPick, loading }) {
       }}
     >
       {/* Icon */}
-      <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{choice.icon}</span>
+      <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{choice.icon}</span>
 
       {/* Name + desc */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
+        <div style={{
           color: C.yellow,
-          fontWeight: '600',
-          fontSize: 12,
+          fontWeight: '700',
+          fontSize: 15,
           fontFamily: "'Cinzel', serif",
           letterSpacing: 0.5,
+          marginBottom: 3,
         }}>
           {choice.name}
-        </span>
-        <span style={{
-          color: C.muted,
-          fontSize: 11,
+        </div>
+        <div style={{
+          color: '#c8b87a',
+          fontSize: 13,
           fontFamily: "'Cinzel', serif",
-          marginLeft: 8,
+          letterSpacing: 0.3,
         }}>
-          — {choice.desc}
-        </span>
+          {choice.desc}
+        </div>
       </div>
 
       {/* Button */}
@@ -55,8 +57,8 @@ function SpecRow({ choice, onPick, loading }) {
           color: C.sand,
           border: `1px solid ${C.crimson}`,
           borderRadius: 4,
-          padding: '4px 12px',
-          fontSize: 11,
+          padding: '6px 14px',
+          fontSize: 13,
           fontFamily: "'Cinzel', serif",
           fontWeight: '600',
           letterSpacing: 1,
@@ -100,17 +102,17 @@ export function PreGameForgeScreen({ run, runId, onRunUpdate, onError }) {
         alignItems: 'center',
         gap: 8,
       }}>
-        <span style={{ color: C.gold, fontSize: 14 }}>⚗</span>
+        <span style={{ color: C.gold, fontSize: 18 }}>⚗</span>
         <span style={{
           color: C.gold,
           fontWeight: '700',
-          fontSize: 13,
+          fontSize: 16,
           fontFamily: "'Cinzel', serif",
           letterSpacing: 1,
         }}>
           Choose Your Path
         </span>
-        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif", marginLeft: 4 }}>
+        <span style={{ color: C.muted, fontSize: 13, fontFamily: "'Cinzel', serif", marginLeft: 4 }}>
           — shapes your upgrade board for the entire run
         </span>
       </div>

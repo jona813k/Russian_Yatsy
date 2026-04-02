@@ -70,7 +70,6 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
     has_berserker         = 'berserker'        in item_ids
     has_crit_freeze       = 'crit_freeze'      in item_ids
     has_crit_lifesteal    = 'crit_lifesteal'   in item_ids
-    has_summon_upgrade    = 'summon_upgrade'   in item_ids
     has_spell_fire        = 'spell_fire'       in item_ids
     has_spell_frost       = 'spell_frost'      in item_ids
     has_spell_heal_summon = 'spell_heal_summon' in item_ids
@@ -83,7 +82,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
 
     eff_crit   = player.crit_chance
     eff_dmg    = player.attack_dmg
-    eff_armor  = min(0.90, player.armor)
+    eff_armor  = min(0.90, player.armor)  # can be negative → player takes extra damage
     eff_aspeed = min(ATTACK_SPEED_CAP, player.attack_speed)
     atk_cd     = round(1.0 / eff_aspeed, 4)
 
@@ -91,15 +90,6 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
     player_hp    = [player.current_hp]
     enemy_hp     = [enemy['hp']]
     summon       = get_summon_stats(player.summon_level)
-
-    if has_summon_upgrade and summon:
-        summon = dict(summon)
-        if summon.get('enrage_below') is not None:
-            summon['enrage_below'] = 0.35
-        if summon.get('spell_vamp') is not None:
-            summon['spell_vamp'] = 0.15
-        if summon.get('dragon_aura') is not None:
-            summon['dragon_aura'] = 0.10
 
     start_hp = summon['hp'] if summon else 0
     if summon_hp_start is not None and summon:
@@ -136,8 +126,6 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
         if t > MAX_TIME:
             break
 
-        aura_mult = (1 + summon['dragon_aura']) if (summon_alive[0] and summon and summon.get('dragon_aura')) else 1.0
-
         if etype == 'player_attack':
             if has_berserker and player_hp[0] < player.max_hp * 0.5:
                 effective_aspeed = min(ATTACK_SPEED_CAP, eff_aspeed * 1.20)
@@ -157,7 +145,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
                 dmg = int(dmg * crit_mult)
 
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
-            dmg = max(1, int(dmg * dark_mult * aura_mult * (1 - eff_enemy_armor)))
+            dmg = max(1, int(dmg * dark_mult * (1 - eff_enemy_armor)))
             hit_count[0] += 1
             atk_consecutive[0] += 1
 
@@ -227,12 +215,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
                     push(t + spell_cooldown, 'spell')
                 continue
 
-            dmg = max(1, int(base_spell_dmg * dark_mult * aura_mult))
-            if summon_alive[0] and summon and summon.get('spell_vamp', 0) > 0:
-                sv = min(int(dmg * summon['spell_vamp']), player.max_hp - player_hp[0])
-                if sv > 0:
-                    player_hp[0] += sv
-                    heal += sv
+            dmg = max(1, int(base_spell_dmg * dark_mult))
             if has_lifesteal_spell and player.lifesteal > 0:
                 siphon_heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
                 if siphon_heal > 0:
@@ -272,16 +255,13 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
                 dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
                 dmg = max(1, int(dmg * dark_mult))
                 enemy_hp[0] = max(0, enemy_hp[0] - dmg)
-                enraged = (summon.get('enrage_below') is not None and
-                           summon_hp[0] < summon['hp'] * summon['enrage_below'])
-                next_speed = 1.0 if enraged else summon['speed']
                 events.append({
                     'time': t, 'type': 'summon_attack',
                     'dmg': dmg, 'dark_mult': round(dark_mult, 2),
-                    'enemy_hp': enemy_hp[0], 'enraged': enraged,
+                    'enemy_hp': enemy_hp[0],
                 })
                 if enemy_hp[0] > 0:
-                    push(t + next_speed, 'summon_attack')
+                    push(t + summon['speed'], 'summon_attack')
 
         elif etype == 'enemy_regen':
             heal = min(enemy_regen, enemy['hp'] - enemy_hp[0])

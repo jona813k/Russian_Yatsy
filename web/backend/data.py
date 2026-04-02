@@ -20,10 +20,10 @@ STAT_DEFS = {
 
 SUMMON_TIERS = [
     {'min_level':  1, 'name': 'Imp',      'attack':  1, 'speed': 2.0, 'hp':  10},
-    {'min_level':  5, 'name': 'Wolf',     'attack':  3, 'speed': 2.0, 'hp':  25},
-    {'min_level': 10, 'name': 'Orc',      'attack':  6, 'speed': 2.0, 'hp':  50, 'enrage_below': 0.25},
-    {'min_level': 15, 'name': 'Skeleton', 'attack': 11, 'speed': 2.0, 'hp': 100, 'spell_vamp': 0.10, 'enrage_below': 0.25},
-    {'min_level': 20, 'name': 'Dragon',   'attack': 18, 'speed': 2.0, 'hp': 200, 'spell_vamp': 0.10, 'dragon_aura': 0.05, 'enrage_below': 0.25},
+    {'min_level':  6, 'name': 'Wolf',     'attack':  3, 'speed': 2.0, 'hp':  25},
+    {'min_level': 12, 'name': 'Orc',      'attack':  6, 'speed': 2.0, 'hp':  50},
+    {'min_level': 18, 'name': 'Skeleton', 'attack': 11, 'speed': 2.0, 'hp': 100},
+    {'min_level': 24, 'name': 'Dragon',   'attack': 18, 'speed': 2.0, 'hp': 200},
 ]
 
 LEVELS = [
@@ -31,9 +31,9 @@ LEVELS = [
         'level': 1,
         'upgrade_turns': 6,
         'enemies': [
-            {'name': 'Human Soldier',  'hp': 100, 'attack':  4, 'speed': 1.5, 'is_boss': False},
-            {'name': 'Human Soldier',  'hp': 100, 'attack':  4, 'speed': 1.5, 'is_boss': False},
-            {'name': 'Bandit Captain', 'hp': 600, 'attack':  8, 'speed': 2.0, 'is_boss': True},
+            {'name': 'Human Soldier',       'hp': 150, 'attack':  4, 'speed': 1.5, 'is_boss': False},
+            {'name': 'Angry Human Soldier', 'hp': 150, 'attack':  9, 'speed': 1.5, 'is_boss': False},
+            {'name': 'Bandit Captain',      'hp': 600, 'attack': 10, 'speed': 2.0, 'is_boss': True},
         ],
     },
     {
@@ -41,8 +41,8 @@ LEVELS = [
         'upgrade_turns': 5,
         'enemies': [
             {'name': 'Orc Warrior',   'hp': 350,  'attack': 14, 'speed': 2.0, 'armor': 0.10, 'is_boss': False},
-            {'name': 'Orc Berserker', 'hp': 300,  'attack': 18, 'speed': 1.5, 'armor': 0.10, 'regen': 3, 'is_boss': False},
-            {'name': 'Orc Warchief',  'hp': 1200, 'attack': 16, 'speed': 2.0, 'is_boss': True},
+            {'name': 'Orc Berserker', 'hp': 350,  'attack': 18, 'speed': 1.5, 'armor': 0.10, 'regen': 3, 'is_boss': False},
+            {'name': 'Orc Warchief',  'hp': 1200, 'attack': 16, 'speed': 2.0, 'armor': 0.10, 'regen': 3, 'is_boss': True},
         ],
     },
     {
@@ -50,8 +50,8 @@ LEVELS = [
         'upgrade_turns': 4,
         'enemies': [
             {'name': 'Dark Knight',  'hp': 600,  'attack': 26, 'speed': 2.0, 'armor': 0.20, 'is_boss': False},
-            {'name': 'Shadow Mage',  'hp': 500,  'attack': 28, 'speed': 1.5, 'armor': 0.20, 'lifesteal': 0.6, 'is_boss': False},
-            {'name': 'Demon Lord',   'hp': 2000, 'attack': 30, 'speed': 1.8, 'is_boss': True},
+            {'name': 'Shadow Mage',  'hp': 1000, 'attack': 28, 'speed': 1.5, 'armor': 0.20, 'lifesteal': 0.5, 'is_boss': False},
+            {'name': 'Demon Lord',   'hp': 2000, 'attack': 35, 'speed': 1.8, 'lifesteal': 0.5, 'is_boss': True},
         ],
     },
 ]
@@ -182,36 +182,3 @@ FORGE_LEVELS = [
 ]
 
 ATTACK_SPEED_CAP = 5.0  # maximum attacks per second
-
-PRE_GAME_FORGE = [
-    {
-        'id':   'spec_a',
-        'name': 'Standard',
-        'desc': 'No changes. All stats upgrade normally.',
-        'icon': '⚖️',
-        'stat_targets': {},
-        'stat_removed': [],
-    },
-    {
-        'id':   'spec_b',
-        'name': 'Aggressor',
-        'desc': (
-            'Attack Speed, Damage, and Crit max out at 4 stacks — they come online fast. '
-            'HP and Armor require 7 stacks instead.'
-        ),
-        'icon': '⚔️',
-        'stat_targets': {1: 4, 2: 4, 3: 4, 4: 7, 5: 7},
-        'stat_removed': [],
-    },
-    {
-        'id':   'spec_c',
-        'name': 'Mage',
-        'desc': (
-            'Spell and Summon max out at 5 stacks. '
-            'Attack Speed, Damage, and Crit require 7 stacks instead.'
-        ),
-        'icon': '🔮',
-        'stat_targets': {1: 7, 2: 7, 3: 7, 8: 5, 9: 5},
-        'stat_removed': [],
-    },
-]

@@ -22,14 +22,14 @@ function StatRow({ label, value, highlight }) {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '3px 0',
+      padding: '5px 0',
       borderBottom: `1px solid ${C.borderDim}`,
     }}>
-      <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif" }}>{label}</span>
+      <span style={{ color: C.muted, fontSize: 15, fontFamily: "'Cinzel', serif" }}>{label}</span>
       <span style={{
         color: highlight ? C.yellow : C.textDim,
         fontWeight: '600',
-        fontSize: 11,
+        fontSize: 15,
         fontFamily: 'monospace',
       }}>
         {value}
@@ -47,9 +47,9 @@ export function PlayerPanel({ player, ownedItems }) {
     ['armor',        fmt('armor', player.armor)],
     ['block_chance', fmt('block_chance', player.block_chance)],
     ['lifesteal',    fmt('lifesteal', player.lifesteal)],
-    player.dark_level > 0 && ['dark_level', player.dark_level],
-    player.summon_level > 0 && ['summon_level', player.summon_level],
-    player.spell_level > 0 && ['spell_level', player.spell_level],
+    ['dark_level',    player.dark_level],
+    ['summon_level',  player.summon_level],
+    ['spell_level',   player.spell_level],
     ['gold',         player.gold],
     ['item_slots',   player.item_slots],
     player.free_items > 0 && ['free_items', player.free_items],
@@ -57,8 +57,8 @@ export function PlayerPanel({ player, ownedItems }) {
 
   return (
     <div style={{
-      minWidth: 160,
-      maxWidth: 180,
+      minWidth: 200,
+      maxWidth: 220,
       background: `linear-gradient(180deg, #1E1208, #180C04)`,
       border: `1px solid ${C.border}`,
       borderRadius: 6,
@@ -74,7 +74,7 @@ export function PlayerPanel({ player, ownedItems }) {
         <div style={{
           color: C.gold,
           fontWeight: '700',
-          fontSize: 12,
+          fontSize: 14,
           letterSpacing: 2,
           textTransform: 'uppercase',
           fontFamily: "'Cinzel', serif",
@@ -86,7 +86,7 @@ export function PlayerPanel({ player, ownedItems }) {
       {/* HP section */}
       <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${C.borderDim}` }}>
         <HPBar current={player.current_hp} max={player.max_hp} />
-        <div style={{ fontSize: 10, color: C.muted, textAlign: 'right', marginTop: 3, fontFamily: 'monospace' }}>
+        <div style={{ fontSize: 14, color: C.muted, textAlign: 'right', marginTop: 3, fontFamily: 'monospace' }}>
           {Math.round(player.current_hp)} / {player.max_hp}
         </div>
       </div>

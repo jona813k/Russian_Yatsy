@@ -178,21 +178,21 @@ export default function RpgApp({ onBack }) {
         overflow: 'hidden',
         display: 'flex',
         gap: 12,
-        alignItems: 'flex-start',
+        alignItems: 'stretch',
         minHeight: 0,
       }}>
         {/* Player panel */}
-        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%', paddingRight: 2 }}>
+        <div style={{ flexShrink: 0, overflowY: 'auto', paddingRight: 2 }}>
           <PlayerPanel player={run.player} ownedItems={run.owned_items} />
         </div>
 
         {/* Main content */}
-        <div style={{ flex: 1, overflowY: 'auto', height: '100%', minWidth: 0, paddingRight: 4 }}>
+        <div style={{ flex: 1, overflowY: 'auto', minWidth: 0, paddingRight: 4 }}>
           {renderMain()}
         </div>
 
         {/* Run path */}
-        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%' }}>
+        <div style={{ flexShrink: 0, overflowY: 'auto' }}>
           <RunPath run={run} />
         </div>
       </div>

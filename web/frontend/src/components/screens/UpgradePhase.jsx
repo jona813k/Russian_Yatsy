@@ -11,7 +11,7 @@ const NUMBER_NAMES = {
 
 const DIE_STAT_LABELS = {
   1:'Spd',2:'Dmg',3:'Crit',4:'Armor',5:'HP',
-  6:'Res',7:'Gold',8:'Summon',9:'Spell',10:'Block',11:'LS',12:'Dark',
+  6:'Research',7:'Gold',8:'Summon',9:'Spell',10:'Block',11:'Life Steal',12:'Dark',
 };
 
 const UPGRADE_INFO = {
@@ -320,7 +320,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       </div>
 
       {/* === ACTIONS === */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center', minHeight: 40 }}>
         {run.free_reroll_available && !selectedNumber && !hasSkipOnly && (
           <Btn
             color={C.purple}
@@ -413,7 +413,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
               <div key={n} style={{
                 background: removed ? '#0A0604' : `rgba(30,18,8,0.8)`,
                 borderRadius: 5,
-                padding: '6px 4px',
+                padding: '9px 6px',
                 textAlign: 'center',
                 border: `1px solid ${removed ? C.borderDim : statColor + '44'}`,
                 opacity: removed ? 0.4 : 1,
@@ -421,12 +421,12 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 cursor: 'help',
               }} title={tooltipLines}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 11, color: removed ? C.mutedDim : statColor, fontFamily: 'monospace', fontWeight: '600' }}>
+                  <span style={{ fontSize: 14, color: removed ? C.mutedDim : statColor, fontFamily: 'monospace', fontWeight: '600' }}>
                     {n}
                   </span>
                 </div>
                 <div style={{
-                  fontSize: 8,
+                  fontSize: 10,
                   color: removed ? C.mutedDim : statColor,
                   marginBottom: 4,
                   whiteSpace: 'nowrap',
@@ -439,15 +439,17 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 <div style={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
                   {Array.from({ length: target }, (_, j) => (
                     <div key={j} style={{
-                      width: Math.max(4, Math.floor(36 / target)),
-                      height: 12,
+                      width: Math.max(12, Math.floor(96 / target)),
+                      height: 19,
                       borderRadius: 2,
                       background: removed
                         ? '#1A0C04'
                         : j < count
                         ? statColor
                         : '#1A0A04',
-                      border: `1px solid ${removed ? C.borderDim : (j < count ? statColor + '88' : C.borderDim)}`,
+                      border: j === thresholdAt - 1 && !removed
+                        ? `1px solid ${statColor}aa`
+                        : `1px solid ${removed ? C.borderDim : (j < count ? statColor + '88' : C.borderDim)}`,
                       boxShadow: j < count && !removed ? `0 0 4px ${statColor}44` : 'none',
                       transition: 'all 0.3s',
                     }} />
@@ -455,7 +457,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 </div>
                 {/* Threshold marker */}
                 {!removed && (
-                  <div style={{ fontSize: 8, color: count >= thresholdAt ? statColor : C.mutedDim, marginTop: 2, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 12, color: count >= thresholdAt ? statColor : C.mutedDim, marginTop: 2, fontFamily: 'monospace' }}>
                     {count}/{target}
                   </div>
                 )}

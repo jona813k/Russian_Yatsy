@@ -19,7 +19,7 @@ from src.game.rules import GameRules
 from src.models.player import Player
 from src.models.game_state import GameState
 
-from .data import LEVELS, SHOP_ITEMS, FORGE_LEVELS, PRE_GAME_FORGE
+from .data import LEVELS, SHOP_ITEMS, FORGE_LEVELS
 from .player import PlayerStats, apply_upgrades
 from .combat import simulate_combat, get_summon_stats
 
@@ -35,6 +35,63 @@ HEAL_POTION = {
     'cost': 50,
     'icon': '🧪',
 }
+
+
+_STAT_NAMES = {
+    1:'Speed', 2:'Damage', 3:'Crit', 4:'Armor', 5:'HP',
+    8:'Summon', 9:'Spell', 10:'Block', 11:'Life Steal',
+}
+
+def generate_pre_game_forge() -> list:
+    """
+    Randomly generate 5 pre-game forge options.
+      x, z, y, w  — 4 distinct stats from 1-5
+      a, b        — 2 distinct stats from 8-11
+    Stats 6 (Research), 7 (Gold), 12 (Dark) are excluded.
+    """
+    low  = random.sample([1, 2, 3, 4, 5], 4)   # x, z, y, w
+    high = random.sample([8, 9, 10, 11],  2)    # a, b
+    x, z, y, w = low
+    a, b        = high
+
+    def n(s): return _STAT_NAMES[s]
+
+    return [
+        {
+            'id': 'opt_1', 'icon': '⚖️',
+            'name': 'No Change',
+            'desc': 'All stats use the default target of 6.',
+            'stat_targets': {}, 'stat_removed': [],
+        },
+        {
+            'id': 'opt_2', 'icon': '🔀',
+            'name': 'Split Focus',
+            'desc': f'{n(z)} & {n(x)}: cap at 5. {n(y)} & {n(w)}: cap at 7.',
+            'stat_targets': {z: 5, x: 5, y: 7, w: 7},
+            'stat_removed': [],
+        },
+        {
+            'id': 'opt_3', 'icon': '🎯',
+            'name': 'Specialist',
+            'desc': f'{n(a)} & {n(b)}: cap at 5. {n(z)}, {n(y)} & {n(x)}: cap at 7.',
+            'stat_targets': {a: 5, b: 5, z: 7, y: 7, x: 7},
+            'stat_removed': [],
+        },
+        {
+            'id': 'opt_4', 'icon': '❌',
+            'name': f'Drop {n(x)}',
+            'desc': f'{n(x)} removed. {n(a)}: cap at 4.',
+            'stat_targets': {a: 4},
+            'stat_removed': [x],
+        },
+        {
+            'id': 'opt_5', 'icon': '🗑️',
+            'name': f'Drop {n(a)}',
+            'desc': f'{n(a)} removed. {n(x)} & {n(y)}: cap at 5.',
+            'stat_targets': {x: 5, y: 5},
+            'stat_removed': [a],
+        },
+    ]
 
 
 def generate_shop_items(level_idx: int = 0, discount: bool = False) -> list:
@@ -235,6 +292,7 @@ class RPGRun:
         self.level_idx        = 0
         self.fight_idx        = 0
         self.phase            = 'pre_game_forge'
+        self.pre_game_forge_choices = generate_pre_game_forge()
         self.upgrade_engine   = None
         self.stat_targets: dict = {}
         self.stat_removed: list = []
@@ -458,7 +516,7 @@ class RPGRun:
     # ------------------------------------------------------------------
 
     def pick_pre_game_forge(self, choice_id: str) -> tuple[bool, str]:
-        choice = next((c for c in PRE_GAME_FORGE if c['id'] == choice_id), None)
+        choice = next((c for c in self.pre_game_forge_choices if c['id'] == choice_id), None)
         if not choice:
             return False, 'invalid choice'
         self.stat_targets = dict(choice.get('stat_targets', {}))
@@ -615,7 +673,7 @@ class RPGRun:
             'phase':                  'upgrade_done' if (self.phase == 'upgrade' and self.upgrade_done) else self.phase,
             'stat_targets':           self.stat_targets,
             'stat_removed':           self.stat_removed,
-            'pre_game_forge_choices': PRE_GAME_FORGE if self.phase == 'pre_game_forge' else [],
+            'pre_game_forge_choices': self.pre_game_forge_choices if self.phase == 'pre_game_forge' else [],
             'level':                  self.level_idx + 1,
             'fight_index':            self.fight_idx,
             'is_boss':                enemy['is_boss'] if enemy else False,

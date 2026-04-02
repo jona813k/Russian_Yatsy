@@ -41,7 +41,7 @@ function PathNode({ node }) {
       transition: 'all 0.2s',
     }}>
       <span style={{
-        fontSize: 12,
+        fontSize: 27,
         color: accent,
         minWidth: 16,
         textAlign: 'center',
@@ -51,7 +51,7 @@ function PathNode({ node }) {
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 10,
+          fontSize: 14,
           color: accent,
           fontWeight: isCurrent ? '600' : '400',
           fontFamily: "'Cinzel', serif",
@@ -62,7 +62,7 @@ function PathNode({ node }) {
           {label}
         </div>
         {sub && !isDone && (
-          <div style={{ fontSize: 9, color: C.mutedDim, fontFamily: 'monospace' }}>{sub}</div>
+          <div style={{ fontSize: 12, color: C.mutedDim, fontFamily: 'monospace' }}>{sub}</div>
         )}
       </div>
       {isCurrent && (
@@ -80,10 +80,10 @@ export function RunPath({ run }) {
   const levelNodes = path.filter(node => node.level === currentLevel);
 
   return (
-    <div style={{ minWidth: 140, maxWidth: 155 }}>
+    <div style={{ minWidth: 200, maxWidth: 155, height: 450 }}>
       <div style={{
         color: C.muted,
-        fontSize: 9,
+        fontSize: 15,
         letterSpacing: 2,
         marginBottom: 8,
         textTransform: 'uppercase',
