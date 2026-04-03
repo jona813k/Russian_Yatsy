@@ -306,8 +306,13 @@ def rpg_upgrade_select(run_id: str, body: SelectRequest):
         raise HTTPException(status_code=400, detail=f"{body.number} is not a legal move")
 
     action = next(a for a in legal if a.get('number') == body.number)
+    # Capture bomb die value before collection/re-roll (for auto-stash on turn_end)
+    run.note_bomb_die_value()
     # Notify the roller which types survive this collection before the engine re-rolls
     run._dice_roller.prepare_for_collection(engine.state.dice_values, body.number)
+    # If the bomb die was consumed by this collection, cancel the pending stash
+    if 'bomb' not in run._dice_roller.types_in_hand:
+        run._bomb_stash_pending = None
     result = engine.execute_action(action)
     run.handle_action_result(result)
 
@@ -329,6 +334,8 @@ def rpg_upgrade_skip(run_id: str):
     if not skip:
         raise HTTPException(status_code=400, detail="No skip available")
 
+    # Capture bomb die value before the turn ends (skip always causes turn_end)
+    run.note_bomb_die_value()
     result = engine.execute_action(skip)
     run.handle_action_result(result)
 
@@ -345,6 +352,18 @@ def rpg_upgrade_reroll(run_id: str):
         raise HTTPException(status_code=400, detail="Not in upgrade phase")
     if not run.use_free_reroll():
         raise HTTPException(status_code=400, detail="Free reroll not available")
+    state = build_rpg_state(run)
+    return state
+
+
+@app.post("/api/rpg/{run_id}/upgrade/retry-reroll")
+def rpg_upgrade_retry_reroll(run_id: str):
+    """Retry die reroll — rerolls only the retry die without costing a turn. Once per turn."""
+    run = get_run(run_id)
+    if run.phase != 'upgrade':
+        raise HTTPException(status_code=400, detail="Not in upgrade phase")
+    if not run.use_retry_die_reroll():
+        raise HTTPException(status_code=400, detail="Retry die reroll not available")
     state = build_rpg_state(run)
     return state
 

@@ -91,6 +91,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const [failedDiceDisplay, setFailedDiceDisplay] = useState(null); // shows in prep table as illegal
   const [actionResult, setActionResult] = useState(null);
   const [rerolling, setRerolling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
 
   // No auto-clear on turn change — staged dice persist so the player can see
@@ -337,6 +338,26 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             }}
           >
             Free Reroll
+          </Btn>
+        )}
+
+        {run.retry_die_available && !selectedNumber && !hasSkipOnly &&
+          selectedIndices.length === 1 && diceTypes[selectedIndices[0]] === 'retry' && (
+          <Btn
+            color='#4A8A20'
+            disabled={retrying}
+            style={{ fontSize: 12 }}
+            onClick={async () => {
+              setRetrying(true);
+              setSelectedIndices([]);
+              try {
+                const resp = await rpgApi.upgradeRetryReroll(runId);
+                onRunUpdate(resp);
+              } catch (e) { if (onError) onError(e); else console.error(e); }
+              setRetrying(false);
+            }}
+          >
+            Retry Die
           </Btn>
         )}
 

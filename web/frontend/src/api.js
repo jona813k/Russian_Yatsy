@@ -65,6 +65,9 @@ export const rpgApi = {
   /** Free reroll — re-rolls all dice without costing a turn (requires forge). */
   upgradeReroll: (runId) => request('POST', `/rpg/${runId}/upgrade/reroll`),
 
+  /** Retry die reroll — rerolls only the retry die without costing a turn (once per turn). */
+  upgradeRetryReroll: (runId) => request('POST', `/rpg/${runId}/upgrade/retry-reroll`),
+
   /** Apply upgrades and move to combat phase. */
   upgradeFinish: (runId) => request('POST', `/rpg/${runId}/upgrade/finish`),
 

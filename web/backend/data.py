@@ -151,16 +151,66 @@ FORGE_LEVELS = [
             'icon': '❌',
         },
     ],
-    # ── Forge II  (after Level 2 boss) ─────────────────────────────────────
+    # ── Forge II  (after Level 2 boss) — pool of 6, 3 shown randomly ─────────
     [
         {
-            'id':   'loaded_high',
-            'name': 'Load: High Numbers',
-            'desc': 'All your dice are loaded toward high faces. '
-                    'Each die has 3/12 chance to roll 4, 5, or 6 '
-                    'but only 1/12 chance to roll 1, 2, or 3 — '
-                    'great for Armor, HP, and Research upgrades.',
-            'icon': '⚖️',
+            'id':   'add_d12',
+            'name': 'Add d12',
+            'desc': 'Add a 12-sided die to your pool permanently. '
+                    'Can show any value 1–12, opening paths to '
+                    'higher numbers like 7, 8, 9, 10, 11, and 12.',
+            'icon': '🎲',
+        },
+        {
+            'id':   'add_d3',
+            'name': 'Add d3',
+            'desc': 'Add a 3-sided die to your pool permanently. '
+                    'Always rolls 1, 2, or 3 — reliable fuel for '
+                    'Speed, Damage, and Crit upgrades.',
+            'icon': '🟢',
+        },
+        {
+            'id':   'dice_plus_one',
+            'name': 'Sharpened Dice',
+            'desc': 'All your normal d6s permanently roll +1 higher '
+                    '(2–7 instead of 1–6), pushing them into '
+                    'mid and high stat territory.',
+            'icon': '⬆️',
+        },
+        {
+            'id':   'add_2_5_die',
+            'name': 'Binary Die',
+            'desc': 'Add a 6-sided die that can only land on 2 or 5. '
+                    'Reliable, focused — always feeds Damage or HP.',
+            'icon': '⚀',
+        },
+        {
+            'id':   'add_retry_die',
+            'name': 'Retry Die',
+            'desc': 'Add a 6-sided die that can be rerolled once per '
+                    'turn. Select it alone to get a second chance '
+                    'at a better value.',
+            'icon': '🔁',
+        },
+        {
+            'id':   'add_logic_die',
+            'name': 'Logic Die',
+            'desc': 'Add a 6-sided die that rolls in a fixed sequence: '
+                    '1→2→3→4→5→6→1→… throughout the entire run. '
+                    'Predictable — if you remember where it was.',
+            'icon': '🔢',
+        },
+    ],
+]
+
+    # ── Forge III  (after Level 3 boss — if extended) — pool of 6, 3 shown randomly ─
+    [
+        {
+            'id':   'risky_die',
+            'name': 'Risky Die',
+            'desc': 'Add a 6-sided die whose faces are 1, 2, 3, 10, 11, 12. '
+                    'High ceiling, high floor — great for reaching the hardest numbers.',
+            'icon': '🎰',
         },
         {
             'id':   'free_reroll',
@@ -171,12 +221,35 @@ FORGE_LEVELS = [
             'icon': '🔄',
         },
         {
-            'id':   'risky_die',
-            'name': 'Risky Die',
-            'desc': 'Replace one d6 with a Risky Die whose faces are '
-                    '1, 2, 3, 10, 11, 12. High ceiling, high floor — '
-                    'great for reaching the hardest numbers.',
-            'icon': '🎰',
+            'id':   'loaded_high',
+            'name': 'Load: High Numbers',
+            'desc': 'All normal dice are weighted toward high faces. '
+                    'Each d6 has 3× more chance to roll 4, 5, or 6 '
+                    'than 1, 2, or 3.',
+            'icon': '⬆️',
+        },
+        {
+            'id':   'loaded_low',
+            'name': 'Load: Low Numbers',
+            'desc': 'All normal dice are weighted toward low faces. '
+                    'Each d6 has 3× more chance to roll 1, 2, or 3 '
+                    'than 4, 5, or 6.',
+            'icon': '⬇️',
+        },
+        {
+            'id':   'add_mirror_die',
+            'name': 'Mirror Die',
+            'desc': 'Add a 6-sided die that always copies the highest '
+                    'value rolled among your other dice. '
+                    'Doubles your best result every roll.',
+            'icon': '🪞',
+        },
+        {
+            'id':   'add_bomb_die',
+            'name': 'Bomb Die',
+            'desc': 'Add a 6-sided die that auto-stashes its value at '
+                    'the end of every turn — even if you never picked it.',
+            'icon': '💣',
         },
     ],
 ]

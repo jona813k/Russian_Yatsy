@@ -44,7 +44,8 @@ _STAT_NAMES = {
 
 def generate_pre_game_forge() -> list:
     """
-    Randomly generate 5 pre-game forge options.
+    Randomly generate 3 pre-game forge options: No Change + 2 randomly picked
+    from the pool of Split Focus, Specialist, Drop X, Drop A.
       x, z, y, w  — 4 distinct stats from 1-5
       a, b        — 2 distinct stats from 8-11
     Stats 6 (Research), 7 (Gold), 12 (Dark) are excluded.
@@ -56,13 +57,7 @@ def generate_pre_game_forge() -> list:
 
     def n(s): return _STAT_NAMES[s]
 
-    return [
-        {
-            'id': 'opt_1', 'icon': '⚖️',
-            'name': 'No Change',
-            'desc': 'All stats use the default target of 6.',
-            'stat_targets': {}, 'stat_removed': [],
-        },
+    pool = [
         {
             'id': 'opt_2', 'icon': '🔀',
             'name': 'Split Focus',
@@ -93,6 +88,16 @@ def generate_pre_game_forge() -> list:
         },
     ]
 
+    return [
+        {
+            'id': 'opt_1', 'icon': '⚖️',
+            'name': 'No Change',
+            'desc': 'All stats use the default target of 6.',
+            'stat_targets': {}, 'stat_removed': [],
+        },
+        *random.sample(pool, 2),
+    ]
+
 
 def generate_shop_items(level_idx: int = 0, discount: bool = False) -> list:
     """Return 3 random tier-appropriate items + the always-available Heal Potion."""
@@ -119,18 +124,26 @@ class StatefulDiceRoller:
     """
 
     def __init__(self, player: PlayerStats):
-        has_risky = player.has_risky_die
-        extra_12  = player.extra_d12
-        extra_3   = player.extra_d3
+        self._player   = player
+        has_risky      = player.has_risky_die
+        extra_12       = player.extra_d12
+        extra_3        = player.extra_d3
         self._weighted = player.loaded_high
+        self._plus_one = player.dice_plus_one
         base_d6 = max(0, 6 - player.removed_dice - (1 if has_risky else 0))
 
         self._full_pool: list[str] = (
-            (['risky'] if has_risky else []) +
+            (['risky']  if has_risky               else []) +
+            (['retry']  if player.has_retry_die    else []) +
+            (['logic']  if player.has_logic_die    else []) +
+            (['2_5']    if player.has_2_5_die      else []) +
+            (['mirror'] if player.has_mirror_die   else []) +
+            (['bomb']   if player.has_bomb_die     else []) +
             ['d12'] * extra_12 +
             ['d3']  * extra_3  +
             ['d6']  * base_d6
         )
+        self._loaded_low = player.loaded_low
         self.total: int = len(self._full_pool)
         self._types_in_hand: list[str] = self._full_pool[:]
 
@@ -138,15 +151,35 @@ class StatefulDiceRoller:
         if t == 'risky': return random.choice([1, 2, 3, 10, 11, 12])
         if t == 'd12':   return random.randint(1, 12)
         if t == 'd3':    return random.randint(1, 3)
+        if t == 'retry': return random.randint(1, 6)
+        if t == 'bomb':  return random.randint(1, 6)
+        if t == '2_5':   return random.choice([2, 5])
+        if t == 'logic':
+            val = (self._player.logic_die_pos % 6) + 1
+            self._player.logic_die_pos += 1
+            return val
+        # Regular d6 (possibly weighted or +1)
         if self._weighted:
-            r = random.randint(1, 12)
-            if r <= 1:   return 1
-            elif r <= 2: return 2
-            elif r <= 3: return 3
-            elif r <= 6: return 4
-            elif r <= 9: return 5
-            else:        return 6
-        return random.randint(1, 6)
+            # 2:1 ratio — high faces (4,5,6) each at 2/9 ≈ 22%, low faces (1,2,3) at 1/9 ≈ 11%
+            r = random.randint(1, 9)
+            if r <= 1:   v = 1
+            elif r <= 2: v = 2
+            elif r <= 3: v = 3
+            elif r <= 5: v = 4
+            elif r <= 7: v = 5
+            else:        v = 6
+        elif self._loaded_low:
+            # 2:1 ratio — low faces (1,2,3) each at 2/9 ≈ 22%, high faces (4,5,6) at 1/9 ≈ 11%
+            r = random.randint(1, 9)
+            if r <= 2:   v = 1
+            elif r <= 4: v = 2
+            elif r <= 6: v = 3
+            elif r <= 7: v = 4
+            elif r <= 8: v = 5
+            else:        v = 6
+        else:
+            v = random.randint(1, 6)
+        return v + (1 if self._plus_one else 0)
 
     def prepare_for_collection(self, dice_values: list, target: int):
         """
@@ -172,7 +205,16 @@ class StatefulDiceRoller:
     def __call__(self, num_dice: int) -> list:
         if num_dice >= self.total:
             self._types_in_hand = self._full_pool[:]
-        return [self._roll_one(t) for t in self._types_in_hand]
+        # Roll all non-mirror dice first, then set mirror = max of others
+        mirror_indices = [i for i, t in enumerate(self._types_in_hand) if t == 'mirror']
+        if not mirror_indices:
+            return [self._roll_one(t) for t in self._types_in_hand]
+        values = [None if t == 'mirror' else self._roll_one(t) for t in self._types_in_hand]
+        others = [v for v in values if v is not None]
+        mirror_val = max(others) if others else 1
+        for i in mirror_indices:
+            values[i] = mirror_val
+        return values
 
     @property
     def types_in_hand(self) -> list[str]:
@@ -303,7 +345,9 @@ class RPGRun:
         self.shop_items          = []
         self.owned_items         = []
         self.forge_choices       = []
-        self.free_reroll_available = False
+        self.free_reroll_available  = False
+        self.retry_die_available    = False
+        self._bomb_stash_pending: int | None = None  # bomb die value captured before turn-ending action
         self._summon_hp_carry: int  = None
         self._shop_reroll_used: bool = False
         self.total_collections: dict = {n: 0 for n in range(1, 13)}
@@ -326,7 +370,12 @@ class RPGRun:
     @property
     def upgrade_pool_size(self) -> int:
         p = self.player
-        return max(1, 6 - p.removed_dice + p.extra_d12 + p.extra_d3)
+        return max(1, 6 - p.removed_dice + p.extra_d12 + p.extra_d3
+                   + (1 if p.has_retry_die  else 0)
+                   + (1 if p.has_logic_die  else 0)
+                   + (1 if p.has_2_5_die    else 0)
+                   + (1 if p.has_mirror_die else 0)
+                   + (1 if p.has_bomb_die   else 0))
 
     # ------------------------------------------------------------------
     # Upgrade phase
@@ -345,17 +394,25 @@ class RPGRun:
         self.upgrade_done = False
         self.last_upgrades = []
         self.free_reroll_available = self.player.has_free_reroll
+        self.retry_die_available   = self.player.has_retry_die
 
     def handle_action_result(self, result: dict):
         """Call after every upgrade action to track turn usage."""
         state = result.get('state')
         if state == 'turn_end':
+            # Bomb die auto-stash: if bomb die wasn't collected, stash its value now
+            if self._bomb_stash_pending is not None:
+                self._auto_collect_bomb_value(self._bomb_stash_pending)
+                self._bomb_stash_pending = None
             self.upgrade_turns_used += 1
             if self.upgrade_turns_used >= self.upgrade_turns_max:
                 self.upgrade_done = True
             self.free_reroll_available = self.player.has_free_reroll
+            self.retry_die_available   = self.player.has_retry_die
         elif state == 'completed_number':
+            self._bomb_stash_pending = None
             self.free_reroll_available = self.player.has_free_reroll
+            self.retry_die_available   = self.player.has_retry_die
 
     def finish_upgrade(self) -> list:
         """Apply stat upgrades and advance to combat phase."""
@@ -533,7 +590,12 @@ class RPGRun:
     def _init_forge(self):
         forge_idx = self.level_idx
         if forge_idx < len(FORGE_LEVELS):
-            self.forge_choices = FORGE_LEVELS[forge_idx]
+            pool = FORGE_LEVELS[forge_idx]
+            # Forge II and III have a pool of 6 — randomly pick 3 each run
+            if forge_idx >= 1 and len(pool) > 3:
+                self.forge_choices = random.sample(pool, 3)
+            else:
+                self.forge_choices = pool
         else:
             self.forge_choices = []
 
@@ -556,6 +618,20 @@ class RPGRun:
             p.has_free_reroll = True
         elif effect == 'risky_die':
             p.has_risky_die = True
+        elif effect == 'dice_plus_one':
+            p.dice_plus_one = True
+        elif effect == 'add_2_5_die':
+            p.has_2_5_die = True
+        elif effect == 'add_retry_die':
+            p.has_retry_die = True
+        elif effect == 'add_logic_die':
+            p.has_logic_die = True
+        elif effect == 'loaded_low':
+            p.loaded_low = True
+        elif effect == 'add_mirror_die':
+            p.has_mirror_die = True
+        elif effect == 'add_bomb_die':
+            p.has_bomb_die = True
 
         self.forge_history.append(choice['id'])
         self.level_idx += 1
@@ -576,6 +652,46 @@ class RPGRun:
         self.upgrade_engine.state.num_dice_in_hand = n
         self.upgrade_engine.total_rolls += 1
         return True
+
+    def use_retry_die_reroll(self) -> bool:
+        """Reroll only the retry die. Available once per turn, requires retry die selected alone."""
+        if not self.retry_die_available:
+            return False
+        if self.upgrade_engine.state.selected_number is not None:
+            return False
+        types = self._dice_roller.types_in_hand
+        retry_idx = next((i for i, t in enumerate(types) if t == 'retry'), None)
+        if retry_idx is None:
+            return False  # retry die was already collected this turn
+        new_value = self._dice_roller._roll_one('retry')
+        self.upgrade_engine.state.dice_values[retry_idx] = new_value
+        self.retry_die_available = False
+        self.upgrade_engine.total_rolls += 1
+        return True
+
+    def note_bomb_die_value(self):
+        """
+        Capture the bomb die's current value BEFORE prepare_for_collection / execute_action.
+        If the bomb die is later consumed by the collection, the caller should clear this.
+        """
+        if not self.player.has_bomb_die:
+            self._bomb_stash_pending = None
+            return
+        types = self._dice_roller.types_in_hand
+        bomb_idx = next((i for i, t in enumerate(types) if t == 'bomb'), None)
+        self._bomb_stash_pending = (
+            self.upgrade_engine.state.dice_values[bomb_idx]
+            if bomb_idx is not None else None
+        )
+
+    def _auto_collect_bomb_value(self, val: int):
+        """Add 1 to the bomb die's value in upgrade progress (respects targets and removals)."""
+        if val not in range(1, 13) or val in self.stat_removed:
+            return
+        target = self.stat_targets.get(val, 6)
+        current = self.upgrade_engine.player.progress.get(val, 0)
+        if current < target:
+            self.upgrade_engine.player.progress[val] = current + 1
 
     # ------------------------------------------------------------------
     # History / serialisation
@@ -683,6 +799,7 @@ class RPGRun:
             'upgrade_pool_size':      self.upgrade_pool_size,
             'upgrade_done':           self.upgrade_done,
             'free_reroll_available':  self.free_reroll_available,
+            'retry_die_available':    self.retry_die_available,
             'player':                 self.player.to_dict(),
             'summon_stats':           get_summon_stats(self.player.summon_level),
             'yatzy':                  yatzy_state,

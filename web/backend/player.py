@@ -29,6 +29,14 @@ class PlayerStats:
     has_risky_die: bool   = False  # one die shows 1/2/3/10/11/12
     loaded_high: bool     = False  # all d6s weighted 3× toward 4/5/6
     has_free_reroll: bool = False  # free reroll on first roll of each upgrade turn
+    dice_plus_one: bool   = False  # all d6s roll +1 higher (2–7)
+    has_2_5_die: bool     = False  # extra die that only shows 2 or 5
+    has_retry_die: bool   = False  # extra die with one reroll per turn
+    has_logic_die: bool   = False  # extra die rolling 1→2→3→4→5→6→1→… in sequence
+    logic_die_pos: int    = 0      # next value index in the logic die sequence (0–5)
+    loaded_low: bool      = False  # all d6s weighted 3× toward 1/2/3
+    has_mirror_die: bool  = False  # extra die that copies the highest rolled value
+    has_bomb_die: bool    = False  # extra die that auto-stashes its value at turn end
     # Item passive flags
     has_shop_free_reroll: bool = False  # each future shop/forge gets 1 free reroll
     has_item_discount: bool    = False  # items cost 20% less
