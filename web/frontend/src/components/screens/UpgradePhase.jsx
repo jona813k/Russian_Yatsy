@@ -193,6 +193,12 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       const hasFailed = !!resp.action_result?.info?.failed_dice;
       console.log('[handleCollect] action_result state=%s hasFailed=%s', st, hasFailed, resp.action_result);
 
+      if (resp.action_result?.success === false) {
+        console.warn('[handleCollect] illegal action rejected by backend:', resp.action_result?.info);
+        onRunUpdate(resp);
+        return;
+      }
+
       if (st === 'completed_number' || st === 'won' || st === 'bonus_turn') {
         // Number finished — clear staged and start fresh
         setStagedDice([]);

@@ -301,14 +301,15 @@ class RPGUpgradeEngine(GameEngine):
         else:
             target = self.state.selected_number
             stat_target = self._target_for(target)
-            if self._can_make_number(self.state.dice_values, target):
+            current_count = self.player.progress.get(target, 0)
+            if current_count < stat_target and self._can_make_number(self.state.dice_values, target):
                 collectible = self._count_collectible(self.state.dice_values, target)
                 legal_actions.append({
                     'type': 'collect',
                     'number': target,
                     'collectible': collectible,
-                    'progress': self.player.progress.get(target, 0),
-                    'remaining_needed': stat_target - self.player.progress.get(target, 0),
+                    'progress': current_count,
+                    'remaining_needed': stat_target - current_count,
                 })
         return legal_actions
 
