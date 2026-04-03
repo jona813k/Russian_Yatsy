@@ -36,7 +36,7 @@ from src.game.engine import GameEngine
 from web.backend.rpg_engine import RPGRun
 from web.backend.gladiator_db import (
     save_character, save_character_to_pool, update_wins, is_showdown_active,
-    get_opponents_for_tier, get_leaderboard, player_stats_to_enemy,
+    get_opponents_for_tier, get_leaderboard, get_all_characters, player_stats_to_enemy,
     completed_character_count,
 )
 from web.backend.combat import simulate_combat
@@ -562,6 +562,11 @@ def gladiator_status():
         'character_count': completed_character_count(),
         'required':        10,
     }
+
+
+@app.get("/api/gladiator/characters")
+def gladiator_characters():
+    return get_all_characters()
 
 
 @app.get("/api/gladiator/leaderboard")

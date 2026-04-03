@@ -158,6 +158,21 @@ def get_opponents_for_tier(tier: int, exclude_run_id: str,
     return result
 
 
+def get_all_characters() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            '''SELECT id, name, timestamp, wins_achieved, stats_json, items_json
+               FROM characters ORDER BY timestamp DESC'''
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d['stats'] = json.loads(d.pop('stats_json'))
+        d['items'] = json.loads(d.pop('items_json'))
+        result.append(d)
+    return result
+
+
 def get_leaderboard() -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
