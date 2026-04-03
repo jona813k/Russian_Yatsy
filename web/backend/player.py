@@ -37,6 +37,8 @@ class PlayerStats:
     loaded_low: bool      = False  # all d6s weighted 3× toward 1/2/3
     has_mirror_die: bool  = False  # extra die that copies the highest rolled value
     has_bomb_die: bool    = False  # extra die that auto-stashes its value at turn end
+    # Gladiator key
+    has_gladiator_key: bool = False  # purchased from shop; required to enter the showdown
     # Item passive flags
     has_shop_free_reroll: bool = False  # each future shop/forge gets 1 free reroll
     has_item_discount: bool    = False  # items cost 20% less

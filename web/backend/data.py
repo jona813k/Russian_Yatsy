@@ -88,6 +88,9 @@ SHOP_ITEMS = [
      'desc': '+5% permanent lifesteal.'},
     {'id': 'heal_on_attack',   'name': 'Bloodbond Hilt',      'tier': 1, 'cost': 100,
      'desc': 'Heal 3 HP on every attack hit.'},
+    {'id': 'gladiator_key',    'name': 'Gladiator Key',        'tier': 1, 'cost': 100,
+     'desc': 'Grants entry to the Gladiator Showdown after a victorious run. '
+             'Without this key your run will not be recorded.'},
 
     # ── Tier 2 — second and third pre-boss shops ───────────────────────────
     {'id': 'atk_execute',      'name': 'Finishing Blade',     'tier': 2, 'cost': 100,
@@ -120,38 +123,13 @@ SHOP_ITEMS = [
      'desc': 'Your spell heals your summon instead of damaging (1 heal per 2 spell dmg).'},
     {'id': 'armor_to_block',   'name': 'Shield Conversion',   'tier': 2, 'cost': 100,
      'desc': 'Convert all armor to block (1% armor → 0.5% block).'},
+    {'id': 'gladiator_key',    'name': 'Gladiator Key',        'tier': 2, 'cost': 100,
+     'desc': 'Grants entry to the Gladiator Showdown after a victorious run. '
+             'Without this key your run will not be recorded.'},
 ]
 
 FORGE_LEVELS = [
-    # ── Forge I  (after Level 1 boss) ──────────────────────────────────────
-    [
-        {
-            'id':   'add_d12',
-            'name': 'Add d12',
-            'desc': 'Add a 12-sided die to your pool permanently. '
-                    'Every future upgrade phase you roll 7 dice — '
-                    'the d12 can show any value 1-12, opening paths '
-                    'to higher numbers like 7, 8, 9, 10, 11 and 12.',
-            'icon': '🎲',
-        },
-        {
-            'id':   'add_d3',
-            'name': 'Add d3',
-            'desc': 'Add a 3-sided die to your pool permanently. '
-                    'It always rolls 1, 2, or 3 — reliable fuel for '
-                    'Attack Speed, Attack Damage, and Crit upgrades.',
-            'icon': '🟢',
-        },
-        {
-            'id':   'remove_die',
-            'name': 'Remove a Die',
-            'desc': 'Permanently remove one d6 from your pool (5 dice total). '
-                    'Fewer dice means less noise and more control over '
-                    'which numbers you hit.',
-            'icon': '❌',
-        },
-    ],
-    # ── Forge II  (after Level 2 boss) — pool of 6, 3 shown randomly ─────────
+    # ── Forge I  (after Level 1 boss) — pool of 6, 3 shown randomly ───────
     [
         {
             'id':   'add_d12',
@@ -201,7 +179,7 @@ FORGE_LEVELS = [
             'icon': '🔢',
         },
     ],
-    # ── Forge III  (after Level 3 boss — if extended) — pool of 6, 3 shown randomly ─
+    # ── Forge II  (after Level 2 boss) — pool of 6, 3 shown randomly ─────────
     [
         {
             'id':   'risky_die',

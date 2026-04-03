@@ -328,8 +328,9 @@ class RPGUpgradeEngine(GameEngine):
 # ---------------------------------------------------------------------------
 
 class RPGRun:
-    def __init__(self):
+    def __init__(self, name: str = 'Anonymous'):
         self.run_id           = str(uuid.uuid4())
+        self.name             = name
         self.player           = PlayerStats()
         self.level_idx        = 0
         self.fight_idx        = 0
@@ -481,6 +482,16 @@ class RPGRun:
             self.player.gold -= item['cost']
             return True, 'ok'
 
+        if item_id == 'gladiator_key':
+            if self.player.has_gladiator_key:
+                return False, 'already have the Gladiator Key'
+            if self.player.gold < item['cost']:
+                return False, 'not enough gold'
+            self.player.gold -= item['cost']
+            self.player.has_gladiator_key = True
+            self.shop_items = [i for i in self.shop_items if i['id'] != item_id]
+            return True, 'ok'
+
         if len(self.owned_items) >= max(1, self.player.item_slots):
             return False, 'no item slots'
 
@@ -530,6 +541,8 @@ class RPGRun:
             block_gain = round(p.armor * 0.5, 4)
             p.block_chance = round(min(0.95, p.block_chance + block_gain), 4)
             p.armor = 0.0
+        elif iid == 'gladiator_key':
+            p.has_gladiator_key = True
 
         self.owned_items.append(item)
         self.shop_items = [i for i in self.shop_items if i['id'] != item_id]
@@ -578,8 +591,8 @@ class RPGRun:
         forge_idx = self.level_idx
         if forge_idx < len(FORGE_LEVELS):
             pool = FORGE_LEVELS[forge_idx]
-            # Forge II and III have a pool of 6 — randomly pick 3 each run
-            if forge_idx >= 1 and len(pool) > 3:
+            # Both forges have a pool of 6 — randomly pick 3 each run
+            if len(pool) > 3:
                 self.forge_choices = random.sample(pool, 3)
             else:
                 self.forge_choices = pool
@@ -688,6 +701,7 @@ class RPGRun:
         outcome = 'win' if self.phase == 'victory' else 'lose'
         return {
             'run_id':        self.run_id,
+            'name':          self.name,
             'timestamp':     self.started_at or datetime.now(timezone.utc).isoformat(),
             'outcome':       outcome,
             'level_reached': self.level_idx + 1 if outcome == 'lose' else 3,
@@ -773,6 +787,7 @@ class RPGRun:
         shop_phases = ('shop', 'pre_boss_shop')
         return {
             'run_id':                 self.run_id,
+            'name':                   self.name,
             'phase':                  'upgrade_done' if (self.phase == 'upgrade' and self.upgrade_done) else self.phase,
             'stat_targets':           self.stat_targets,
             'stat_removed':           self.stat_removed,

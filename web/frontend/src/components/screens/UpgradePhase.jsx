@@ -127,6 +127,23 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
 
   const isLegalTarget = targetNumber !== null && legalNumbers.includes(targetNumber);
 
+  // === LOCK DEBUG ===
+  console.log('[UpgradePhase] render', {
+    phase: run.phase,
+    turnsRemaining,
+    dice,
+    diceTypes,
+    legalActions,
+    legalNumbers,
+    hasSkipOnly,
+    selectedNumber,
+    selectedIndices,
+    targetNumber,
+    isLegalTarget,
+    free_reroll_available: run.free_reroll_available,
+    retry_die_available: run.retry_die_available,
+  });
+
   function getDieState(idx) {
     if (selectedIndices.includes(idx)) return 'userSelected';
     const dieVal = dice[idx];
@@ -160,6 +177,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
 
   async function handleCollect() {
     if (!isLegalTarget) return;
+    console.log('[handleCollect] called', { targetNumber, dice, legalActions });
     const tempDice = [...dice];
     const justCollected = computeCollectedValues(dice, targetNumber).map(v => {
       const idx = tempDice.indexOf(v);
@@ -168,30 +186,44 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
     });
     try {
       const resp = await rpgApi.upgradeSelect(runId, targetNumber);
+      console.log('[handleCollect] response', resp);
       setSelectedIndices([]);
       setActionResult(resp.action_result);
       const st = resp.action_result?.state;
       const hasFailed = !!resp.action_result?.info?.failed_dice;
+      console.log('[handleCollect] action_result state=%s hasFailed=%s', st, hasFailed, resp.action_result);
 
       if (st === 'completed_number' || st === 'won' || st === 'bonus_turn') {
         // Number finished — clear staged and start fresh
         setStagedDice([]);
+        console.log('[handleCollect] branch: completed/won/bonus_turn → clear staged');
       } else if (!hasFailed) {
         // Mid-turn re-roll: accumulate collected dice into staged area
         setStagedDice(prev => [...prev, ...justCollected]);
+        console.log('[handleCollect] branch: mid-turn reroll → staged accumulated');
       } else {
         // Failed roll (turn_end) — move collected dice to staged so they stay
         // visible alongside the new roll; do NOT clear them
         setStagedDice(prev => [...prev, ...justCollected]);
+        console.log('[handleCollect] branch: failed roll → staged accumulated, will call onRunUpdate after timeout');
       }
 
       if (hasFailed) {
         setFailedDiceDisplay(resp.action_result.info.failed_dice);
-        setTimeout(() => { setFailedDiceDisplay(null); setStagedDice([]); onRunUpdate(resp); }, 1200);
+        setTimeout(() => {
+          console.log('[handleCollect] timeout fired → calling onRunUpdate', resp);
+          setFailedDiceDisplay(null);
+          setStagedDice([]);
+          onRunUpdate(resp);
+        }, 1200);
       } else {
+        console.log('[handleCollect] calling onRunUpdate immediately');
         onRunUpdate(resp);
       }
-    } catch (e) { if (onError) onError(e); else console.error(e); }
+    } catch (e) {
+      console.error('[handleCollect] ERROR', e);
+      if (onError) onError(e); else console.error(e);
+    }
   }
 
   async function handleSkip() {

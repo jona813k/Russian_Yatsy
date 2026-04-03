@@ -32,12 +32,20 @@ logger = logging.getLogger(__name__)
 
 from src.game.engine import GameEngine
 from web.backend.rpg_engine import RPGRun
+from web.backend.gladiator_db import (
+    save_character, save_character_to_pool, update_wins, is_showdown_active,
+    get_opponents_for_tier, get_leaderboard, player_stats_to_enemy,
+    completed_character_count,
+)
+from web.backend.combat import simulate_combat
 
 # ---------------------------------------------------------------------------
 # Run history — persisted to JSON so it survives server restarts
 # ---------------------------------------------------------------------------
 
-HISTORY_FILE = Path(__file__).parent / 'run_history.json'
+_DATA_DIR = Path(os.environ.get('DATA_DIR', Path(__file__).parent))
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+HISTORY_FILE = _DATA_DIR / 'run_history.json'
 
 def load_history() -> list:
     if HISTORY_FILE.exists():
@@ -80,8 +88,9 @@ async def startup():
 
 SESSION_TTL = timedelta(hours=2)   # idle sessions expire after 2 hours
 
-sessions:  dict[str, tuple[GameEngine, datetime]] = {}
-rpg_runs:  dict[str, tuple[RPGRun,       datetime]] = {}
+sessions:       dict[str, tuple[GameEngine, datetime]] = {}
+rpg_runs:       dict[str, tuple[RPGRun,       datetime]] = {}
+gauntlet_sessions: dict[str, dict] = {}   # gauntlet_id → gauntlet state dict
 
 
 async def _cleanup_loop():
@@ -268,8 +277,14 @@ class ItemRequest(BaseModel):
     item_id: str
     use_free: bool = False
 
+class NewRunRequest(BaseModel):
+    name: str = 'Anonymous'
+
 class PreGameForgeRequest(BaseModel):
     choice_id: str
+
+class GladiatorFightRequest(BaseModel):
+    skip: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -277,9 +292,10 @@ class PreGameForgeRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/rpg/new")
-def rpg_new():
+def rpg_new(body: NewRunRequest = None):
     """Start a new RPG run and return the initial state."""
-    run = RPGRun()
+    name = (body.name.strip() or 'Anonymous') if body else 'Anonymous'
+    run = RPGRun(name=name)
     run.started_at = datetime.now(timezone.utc).isoformat()
     rpg_runs[run.run_id] = (run, _now())
     return build_rpg_state(run)
@@ -390,6 +406,15 @@ def rpg_combat_start(run_id: str):
         # Save history when the run reaches a terminal state
         if run.phase in ('game_over', 'victory'):
             save_to_history(run.to_summary())
+            if run.phase == 'victory':
+                timestamp = run.started_at or datetime.now(timezone.utc).isoformat()
+                save_character_to_pool(
+                    name=run.name,
+                    run_id=run_id,
+                    timestamp=timestamp,
+                    stats=run.player.to_dict(),
+                    items=[i['id'] for i in run.owned_items],
+                )
     elif run.last_combat is not None:
         combat = run.last_combat
     else:
@@ -475,4 +500,189 @@ def rpg_history_clear():
     HISTORY_FILE.write_text('[]', encoding='utf-8')
     return {'cleared': True}
 
+
+# ---------------------------------------------------------------------------
+# Gladiator Showdown routes
+# ---------------------------------------------------------------------------
+
+def _build_gauntlet_response(g: dict, combat: dict | None = None) -> dict:
+    """Serialise gauntlet session to a JSON-safe dict."""
+    next_opp = None
+    if g['status'] == 'active' and g['fight_in_tier'] < 3:
+        opp = g['opponents'][g['fight_in_tier']]
+        next_opp = {
+            'name':  opp['name'],
+            'stats': _safe_stats(opp),
+        }
+    resp = {
+        'gauntlet_id':    g['gauntlet_id'],
+        'player_name':    g['player_name'],
+        'current_wins':   g['current_wins'],
+        'fight_in_tier':  g['fight_in_tier'],
+        'wins_in_tier':   g['wins_in_tier'],
+        'status':         g['status'],
+        'final_wins':     g['final_wins'],
+        'next_opponent':  next_opp,
+    }
+    if combat is not None:
+        resp['combat'] = combat
+    return resp
+
+
+def _safe_stats(char: dict) -> dict:
+    """Return a summary of the opponent's key stats for display."""
+    import json as _json
+    stats = _json.loads(char['stats_json'])
+    return {
+        'max_hp':       stats.get('max_hp', 0),
+        'attack_dmg':   stats.get('attack_dmg', 0),
+        'attack_speed': round(stats.get('attack_speed', 0.5), 2),
+        'armor':        round(stats.get('armor', 0) * 100),
+        'crit_chance':  round(stats.get('crit_chance', 0) * 100),
+        'lifesteal':    round(stats.get('lifesteal', 0) * 100),
+        'dark_level':   stats.get('dark_level', 0),
+        'summon_level': stats.get('summon_level', 0),
+        'spell_level':  stats.get('spell_level', 0),
+    }
+
+
+@app.get("/api/gladiator/status")
+def gladiator_status():
+    """Return whether the showdown is open and how many characters are in the pool."""
+    return {
+        'active':          is_showdown_active(),
+        'character_count': completed_character_count(),
+        'required':        10,
+    }
+
+
+@app.get("/api/gladiator/leaderboard")
+def gladiator_leaderboard():
+    """Return all leaderboard entries, best wins first."""
+    return get_leaderboard()
+
+
+@app.post("/api/rpg/{run_id}/gladiator/enter")
+def gladiator_enter(run_id: str):
+    """
+    Called when a victorious run with a Gladiator Key wants to enter the showdown.
+    Saves the character to the DB, creates a gauntlet session, and returns the first
+    opponent.
+    """
+    run = get_run(run_id)
+    if run.phase != 'victory':
+        raise HTTPException(status_code=400, detail='Run is not in victory phase')
+    if not run.player.has_gladiator_key:
+        raise HTTPException(status_code=400, detail='No Gladiator Key')
+    if not is_showdown_active():
+        raise HTTPException(status_code=400, detail='Showdown not yet active — need 10 completed characters in the pool')
+
+    import json as _json
+    timestamp = run.started_at or datetime.now(timezone.utc).isoformat()
+    char_id = save_character(
+        name=run.name,
+        run_id=run_id,
+        timestamp=timestamp,
+        stats=run.player.to_dict(),
+        items=[i['id'] for i in run.owned_items],
+    )
+    if char_id is None:
+        raise HTTPException(status_code=500, detail='Failed to save character')
+
+    opponents = get_opponents_for_tier(tier=0, exclude_run_id=run_id, already_used_ids=[])
+    if not opponents:
+        raise HTTPException(status_code=400, detail='No opponents available at tier 0')
+
+    gauntlet_id = str(uuid.uuid4())
+    g = {
+        'gauntlet_id':       gauntlet_id,
+        'run_id':            run_id,
+        'character_db_id':   char_id,
+        'player_stats':      run.player.to_dict(),
+        'player_items':      run.owned_items,
+        'player_name':       run.name,
+        'current_wins':      0,
+        'fight_in_tier':     0,
+        'wins_in_tier':      0,
+        'opponents':         opponents,
+        'used_opponent_ids': [o['id'] for o in opponents],
+        'status':            'active',
+        'final_wins':        None,
+    }
+    gauntlet_sessions[gauntlet_id] = g
+    return _build_gauntlet_response(g)
+
+
+@app.post("/api/gladiator/{gauntlet_id}/fight")
+def gladiator_fight(gauntlet_id: str, body: GladiatorFightRequest = None):
+    """
+    Simulate the next gladiator fight (or skip it).
+    Returns the combat result and updated gauntlet state.
+    """
+    g = gauntlet_sessions.get(gauntlet_id)
+    if g is None:
+        raise HTTPException(status_code=404, detail='Gauntlet session not found')
+    if g['status'] != 'active':
+        raise HTTPException(status_code=400, detail='Gauntlet already complete')
+    if g['fight_in_tier'] >= 3:
+        raise HTTPException(status_code=400, detail='Tier already complete — call /advance')
+
+    # Build player and opponent
+    import json as _json
+    from .player import PlayerStats
+
+    raw = g['player_stats']
+    player = PlayerStats(**{k: v for k, v in raw.items() if hasattr(PlayerStats, k)})
+    player.current_hp = player.max_hp   # full HP each fight
+
+    opponent = g['opponents'][g['fight_in_tier']]
+    opp_stats = _json.loads(opponent['stats_json'])
+    enemy_dict = player_stats_to_enemy(opp_stats, opponent['name'])
+
+    combat = simulate_combat(player, enemy_dict, g['player_items'])
+    if body and body.skip:
+        combat['events'] = []   # strip events so frontend skips animation
+
+    # Record result
+    won = combat['result'] == 'win'
+    g['fight_in_tier'] += 1
+    if won:
+        g['wins_in_tier'] += 1
+
+    tier_done = g['fight_in_tier'] >= 3
+    advancing = tier_done and g['wins_in_tier'] >= 2
+    eliminated = tier_done and not advancing
+
+    if tier_done:
+        if advancing:
+            g['current_wins'] += 1
+            new_tier = g['current_wins']
+            new_opponents = get_opponents_for_tier(
+                tier=new_tier,
+                exclude_run_id=g['run_id'],
+                already_used_ids=g['used_opponent_ids'],
+            )
+            if not new_opponents:
+                # No opponents at this tier — player wins by default, showdown ends
+                g['status'] = 'complete'
+                g['final_wins'] = g['current_wins']
+                update_wins(g['character_db_id'], g['final_wins'])
+            else:
+                g['opponents'] = new_opponents
+                g['used_opponent_ids'] += [o['id'] for o in new_opponents]
+                g['fight_in_tier'] = 0
+                g['wins_in_tier'] = 0
+        else:
+            g['status'] = 'complete'
+            g['final_wins'] = g['current_wins']
+            update_wins(g['character_db_id'], g['final_wins'])
+
+    resp = _build_gauntlet_response(g, combat=combat)
+    resp['tier_done'] = tier_done
+    resp['advancing'] = advancing
+    resp['eliminated'] = eliminated
+    resp['fight_result'] = combat['result']
+    resp['opponent_name'] = opponent['name']
+    resp['opponent_stats'] = _safe_stats(opponent)
+    return resp
 

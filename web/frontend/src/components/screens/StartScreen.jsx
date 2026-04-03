@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { C } from '../../theme.js';
 import { Btn } from '../ui/Btn.jsx';
 
@@ -49,6 +50,8 @@ function ColossumArch({ style }) {
 }
 
 export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
+  const [name, setName] = useState('');
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -151,11 +154,37 @@ export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
           <div style={{ flex: 1, height: 1, background: `linear-gradient(270deg, transparent, ${C.gold}55)` }} />
         </div>
 
-        <p style={{ color: C.muted, fontSize: 12, marginBottom: 28, lineHeight: 1.7, letterSpacing: 0.5 }}>
+        <p style={{ color: C.muted, fontSize: 12, marginBottom: 20, lineHeight: 1.7, letterSpacing: 0.5 }}>
           Roll your dice between battles.<br />
           Grow stronger. Survive three levels.<br />
           Claim glory in the arena.
         </p>
+
+        {/* Gladiator name input */}
+        <div style={{ marginBottom: 20 }}>
+          <input
+            type="text"
+            placeholder="Enter your gladiator name…"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !loading && onStart(name.trim() || 'Anonymous')}
+            maxLength={32}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '9px 14px',
+              background: 'rgba(15,10,4,0.8)',
+              border: `1px solid ${name.trim() ? C.gold + '88' : C.borderDim}`,
+              borderRadius: 4,
+              color: name.trim() ? C.text : C.muted,
+              fontFamily: "'Cinzel', serif",
+              fontSize: 13,
+              letterSpacing: 1,
+              outline: 'none',
+              transition: 'border-color 0.2s',
+            }}
+          />
+        </div>
 
         {error && (
           <div style={{
@@ -172,7 +201,7 @@ export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
         )}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Btn onClick={onStart} disabled={loading} color={C.crimson} style={{ fontSize: 13, padding: '10px 28px', letterSpacing: 2 }}>
+          <Btn onClick={() => onStart(name.trim() || 'Anonymous')} disabled={loading} color={C.crimson} style={{ fontSize: 13, padding: '10px 28px', letterSpacing: 2 }}>
             {loading ? 'Entering Arena…' : 'Enter the Arena'}
           </Btn>
           <Btn onClick={onHistory} color={C.stone} style={{ fontSize: 12, padding: '10px 18px' }}>
