@@ -431,28 +431,15 @@ class RPGRun:
     def run_combat(self) -> dict:
         """Simulate the fight, update player HP, advance phase."""
         item_ids = {i['id'] for i in self.owned_items}
-        has_bounty_50g     = 'bounty_50g'      in item_ids
-        has_summon_survive = 'summon_survive'   in item_ids
+        has_bounty_50g = 'bounty_50g' in item_ids
 
-        summon_hp_start = None
-        if has_summon_survive and getattr(self, '_summon_hp_carry', None):
-            summon_hp_start = self._summon_hp_carry
-
-        combat = simulate_combat(self.player, self.current_enemy, self.owned_items, summon_hp_start)
+        combat = simulate_combat(self.player, self.current_enemy, self.owned_items)
         self.last_combat = combat
 
         if has_bounty_50g and combat['result'] == 'win':
             self.player.gold += 50
 
-        if has_summon_survive:
-            remaining = combat.get('summon_hp_remaining', 0)
-            if remaining > 0 and combat['result'] == 'win':
-                self._summon_hp_carry = remaining
-                self.player.summon_level += 1
-            else:
-                self._summon_hp_carry = None
-        else:
-            self._summon_hp_carry = None
+        self._summon_hp_carry = None
 
         if combat['result'] == 'lose':
             self.phase = 'game_over'

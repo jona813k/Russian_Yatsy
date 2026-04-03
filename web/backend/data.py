@@ -73,17 +73,17 @@ SHOP_ITEMS = [
     {'id': 'item_discount',    'name': 'Merchant Badge',      'tier': 1, 'cost': 100,
      'desc': 'Item costs are reduced by 20%.'},
     {'id': 'gold_level_bonus', 'name': 'Gold Vein',           'tier': 1, 'cost': 100,
-     'desc': 'Gold upgrades give 5 extra gold per upgrade.'},
+     'desc': 'Gold upgrades give 10 extra gold per upgrade.'},
     {'id': 'bounty_50g',       'name': 'Bounty Token',        'tier': 1, 'cost': 100,
      'desc': 'Gain 50 gold each time you kill an enemy.'},
-    {'id': 'summon_survive',   'name': 'Soul Tether',         'tier': 1, 'cost': 100,
-     'desc': 'Your summon survives fights and gains 1 level per fight won.'},
+    {'id': 'summon_survive',   'name': 'Iron Pelt',           'tier': 1, 'cost': 100,
+     'desc': 'Your summon has 10% armor — all damage it takes is reduced by 10%.'},
     {'id': 'block_reflect',    'name': 'Thorned Buckler',     'tier': 1, 'cost': 100,
      'desc': 'Blocked damage is returned to the attacker.'},
     {'id': 'block_atk_buff',   'name': "Guardian's Edge",     'tier': 1, 'cost': 100,
      'desc': 'Blocking an enemy attack increases your attack damage by 5 for 2s.'},
     {'id': 'lifesteal_spell',  'name': 'Siphon Stone',        'tier': 1, 'cost': 100,
-     'desc': 'Lifesteal now also applies to spell damage.'},
+     'desc': 'Spell damage heals you for 50% of your lifesteal rate.'},
     {'id': 'lifesteal_5pct',   'name': 'Vampiric Pendant',    'tier': 1, 'cost': 100,
      'desc': '+5% permanent lifesteal.'},
     {'id': 'heal_on_attack',   'name': 'Bloodbond Hilt',      'tier': 1, 'cost': 100,
@@ -201,8 +201,6 @@ FORGE_LEVELS = [
             'icon': '🔢',
         },
     ],
-]
-
     # ── Forge III  (after Level 3 boss — if extended) — pool of 6, 3 shown randomly ─
     [
         {

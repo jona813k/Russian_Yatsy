@@ -42,7 +42,7 @@ class PlayerStats:
     has_item_discount: bool    = False  # items cost 20% less
     has_crit_to_aspeed: bool   = False  # crit upgrades convert to atk speed
     has_armor_gives_hp: bool   = False  # armor upgrades also give HP (1% → 2 HP)
-    has_gold_level_bonus: bool = False  # gold upgrades give +5 extra gold
+    has_gold_level_bonus: bool = False  # gold upgrades give +10 extra gold
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -142,7 +142,7 @@ def apply_upgrades(player: PlayerStats, collections: dict,
 
         # Gold level bonus (item: gold_level_bonus)
         if attr == 'gold' and getattr(player, 'has_gold_level_bonus', False):
-            player.gold += 5
+            player.gold += 10
             events.append({
                 'number': num, 'stat': 'gold', 'gained': 5,
                 'threshold_bonus': False,

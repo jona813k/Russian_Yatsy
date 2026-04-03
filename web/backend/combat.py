@@ -217,7 +217,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
 
             dmg = max(1, int(base_spell_dmg * dark_mult))
             if has_lifesteal_spell and player.lifesteal > 0:
-                siphon_heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
+                siphon_heal = min(round(dmg * player.lifesteal * 0.5), player.max_hp - player_hp[0])
                 if siphon_heal > 0:
                     player_hp[0] += siphon_heal
                     heal += siphon_heal
@@ -289,6 +289,8 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
                     guard_buff_until[0] = t + 2.0
             elif summon_alive[0]:
                 raw = enemy['attack']
+                if 'summon_survive' in item_ids:
+                    raw = max(1, int(raw * 0.9))  # Iron Pelt: 10% summon armor
                 summon_hp[0] = max(0, summon_hp[0] - raw)
                 ev['summon_dmg'] = raw
                 ev['summon_hp']  = summon_hp[0]
