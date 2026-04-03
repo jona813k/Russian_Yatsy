@@ -100,10 +100,14 @@ def generate_pre_game_forge() -> list:
 
 
 def generate_shop_items(level_idx: int = 0, discount: bool = False) -> list:
-    """Return 3 random tier-appropriate items + the always-available Heal Potion."""
+    """Return 3 random tier-appropriate items + the always-available Heal Potion.
+    The Gladiator Key is always included as a guaranteed slot."""
     tier = 1 if level_idx == 0 else 2
-    pool = [i for i in SHOP_ITEMS if i['tier'] == tier]
+    key = next((i for i in SHOP_ITEMS if i['id'] == 'gladiator_key' and i['tier'] == tier), None)
+    pool = [i for i in SHOP_ITEMS if i['tier'] == tier and i['id'] != 'gladiator_key']
     items = random.sample(pool, min(3, len(pool)))
+    if key:
+        items = [key] + items
     if discount:
         items = [{**i, 'cost': int(i['cost'] * 0.8)} for i in items]
     return [HEAL_POTION] + items

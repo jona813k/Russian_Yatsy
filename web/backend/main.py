@@ -204,18 +204,6 @@ def health():
     return {"status": "ok"}
 
 
-# ---------------------------------------------------------------------------
-# Serve frontend — must come AFTER all API routes
-# ---------------------------------------------------------------------------
-_DIST = Path(__file__).parent.parent / 'frontend' / 'dist'
-
-if _DIST.exists():
-    app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
-
-    @app.get("/{full_path:path}")
-    def serve_frontend(full_path: str):
-        return FileResponse(str(_DIST / "index.html"))
-
 
 @app.get("/api/game/{session_id}/state")
 def get_state(session_id: str):
@@ -706,3 +694,15 @@ def gladiator_fight(gauntlet_id: str, body: GladiatorFightRequest = None):
     resp['opponent_stats'] = _safe_stats(opponent)
     return resp
 
+
+# ---------------------------------------------------------------------------
+# Serve frontend — must come AFTER all API routes
+# ---------------------------------------------------------------------------
+_DIST = Path(__file__).parent.parent / 'frontend' / 'dist'
+
+if _DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_frontend(full_path: str):
+        return FileResponse(str(_DIST / "index.html"))
