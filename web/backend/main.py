@@ -199,6 +199,11 @@ def new_game():
     return state
 
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/api/game/{session_id}/state")
 def get_state(session_id: str):
     engine = get_session(session_id)
