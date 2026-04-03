@@ -41,6 +41,11 @@ const DIE_TYPE_STYLES = {
   d12:   { bg: '#2A1840', border: '#7A3A9A', text: '#C084FC' },
   d3:    { bg: '#1A1A08', border: '#8A7A20', text: '#E8C84A' },
   risky: { bg: '#3A0808', border: '#8B1A1A', text: '#F87171' },
+  retry:  { bg: '#1A2A08', border: '#4A8A20', text: '#80C840' },
+  logic:  { bg: '#041A1A', border: '#207880', text: '#40C8D0' },
+  '2_5':  { bg: '#1A0A28', border: '#6A30A0', text: '#A060D8' },
+  mirror: { bg: '#081820', border: '#2060A0', text: '#60B8E8' },
+  bomb:   { bg: '#281008', border: '#A03010', text: '#E86030' },
   normal:{ bg: '#2A1A08', border: C.border,  text: C.sand },
 };
 

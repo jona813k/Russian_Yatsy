@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { rpgApi, RunExpiredError } from './api';
+import { GladiatorScreen } from './components/screens/GladiatorScreen.jsx';
 
 // Layout
 import { RunHeader }   from './components/layout/RunHeader.jsx';
@@ -31,12 +32,13 @@ export default function RpgApp({ onBack }) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [gauntlet, setGauntlet] = useState(null);  // active gladiator gauntlet state
 
-  async function startRun() {
+  async function startRun(name = 'Anonymous') {
     setLoading(true);
     setError(null);
     try {
-      const resp = await rpgApi.newRun();
+      const resp = await rpgApi.newRun(name);
       setRun(resp);
       setRunId(resp.run_id);
     } catch {
@@ -64,11 +66,23 @@ export default function RpgApp({ onBack }) {
     return <HistoryScreen onBack={() => setShowHistory(false)} />;
   }
 
+  // ── Gladiator Showdown screen ───────────────────────────────────────────
+  if (gauntlet) {
+    return (
+      <GladiatorScreen
+        gauntlet={gauntlet}
+        runId={runId}
+        onUpdate={setGauntlet}
+        onFinish={() => { setGauntlet(null); setRun(null); setRunId(null); }}
+      />
+    );
+  }
+
   // ── Start screen ────────────────────────────────────────────────────────
   if (!run) {
     return (
       <StartScreen
-        onStart={startRun}
+        onStart={(name) => startRun(name)}
         onHistory={() => setShowHistory(true)}
         onBack={onBack}
         loading={loading}
@@ -90,7 +104,7 @@ export default function RpgApp({ onBack }) {
     if (phase === 'pre_boss_shop' || phase === 'shop') return <ShopScreen {...props} />;
     if (phase === 'forge')           return <ForgeScreen {...props} />;
     if (phase === 'game_over')       return <GameOverScreen run={run} onRestart={() => setRun(null)} />;
-    if (phase === 'victory')         return <VictoryScreen run={run} onRestart={() => setRun(null)} />;
+    if (phase === 'victory')         return <VictoryScreen run={run} runId={runId} onRestart={() => setRun(null)} onGauntlet={setGauntlet} />;
     return <div style={{ color: C.muted, fontFamily: "'Cinzel', serif" }}>Unknown phase: {phase}</div>;
   }
 
@@ -178,21 +192,21 @@ export default function RpgApp({ onBack }) {
         overflow: 'hidden',
         display: 'flex',
         gap: 12,
-        alignItems: 'flex-start',
+        alignItems: 'stretch',
         minHeight: 0,
       }}>
         {/* Player panel */}
-        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%', paddingRight: 2 }}>
+        <div style={{ flexShrink: 0, overflowY: 'auto', paddingRight: 2 }}>
           <PlayerPanel player={run.player} ownedItems={run.owned_items} />
         </div>
 
         {/* Main content */}
-        <div style={{ flex: 1, overflowY: 'auto', height: '100%', minWidth: 0, paddingRight: 4 }}>
+        <div style={{ flex: 1, overflowY: 'auto', minWidth: 0, paddingRight: 4 }}>
           {renderMain()}
         </div>
 
         {/* Run path */}
-        <div style={{ flexShrink: 0, overflowY: 'auto', height: '100%' }}>
+        <div style={{ flexShrink: 0, overflowY: 'auto' }}>
           <RunPath run={run} />
         </div>
       </div>

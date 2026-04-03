@@ -11,7 +11,7 @@ const NUMBER_NAMES = {
 
 const DIE_STAT_LABELS = {
   1:'Spd',2:'Dmg',3:'Crit',4:'Armor',5:'HP',
-  6:'Res',7:'Gold',8:'Summon',9:'Spell',10:'Block',11:'LS',12:'Dark',
+  6:'Research',7:'Gold',8:'Summon',9:'Spell',10:'Block',11:'Life Steal',12:'Dark',
 };
 
 const UPGRADE_INFO = {
@@ -91,6 +91,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
   const [failedDiceDisplay, setFailedDiceDisplay] = useState(null); // shows in prep table as illegal
   const [actionResult, setActionResult] = useState(null);
   const [rerolling, setRerolling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [stagedDice, setStagedDice] = useState([]);
 
   // No auto-clear on turn change — staged dice persist so the player can see
@@ -126,6 +127,23 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
 
   const isLegalTarget = targetNumber !== null && legalNumbers.includes(targetNumber);
 
+  // === LOCK DEBUG ===
+  console.log('[UpgradePhase] render', {
+    phase: run.phase,
+    turnsRemaining,
+    dice,
+    diceTypes,
+    legalActions,
+    legalNumbers,
+    hasSkipOnly,
+    selectedNumber,
+    selectedIndices,
+    targetNumber,
+    isLegalTarget,
+    free_reroll_available: run.free_reroll_available,
+    retry_die_available: run.retry_die_available,
+  });
+
   function getDieState(idx) {
     if (selectedIndices.includes(idx)) return 'userSelected';
     const dieVal = dice[idx];
@@ -159,6 +177,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
 
   async function handleCollect() {
     if (!isLegalTarget) return;
+    console.log('[handleCollect] called', { targetNumber, dice, legalActions });
     const tempDice = [...dice];
     const justCollected = computeCollectedValues(dice, targetNumber).map(v => {
       const idx = tempDice.indexOf(v);
@@ -167,30 +186,44 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
     });
     try {
       const resp = await rpgApi.upgradeSelect(runId, targetNumber);
+      console.log('[handleCollect] response', resp);
       setSelectedIndices([]);
       setActionResult(resp.action_result);
       const st = resp.action_result?.state;
       const hasFailed = !!resp.action_result?.info?.failed_dice;
+      console.log('[handleCollect] action_result state=%s hasFailed=%s', st, hasFailed, resp.action_result);
 
       if (st === 'completed_number' || st === 'won' || st === 'bonus_turn') {
         // Number finished — clear staged and start fresh
         setStagedDice([]);
+        console.log('[handleCollect] branch: completed/won/bonus_turn → clear staged');
       } else if (!hasFailed) {
         // Mid-turn re-roll: accumulate collected dice into staged area
         setStagedDice(prev => [...prev, ...justCollected]);
+        console.log('[handleCollect] branch: mid-turn reroll → staged accumulated');
       } else {
         // Failed roll (turn_end) — move collected dice to staged so they stay
         // visible alongside the new roll; do NOT clear them
         setStagedDice(prev => [...prev, ...justCollected]);
+        console.log('[handleCollect] branch: failed roll → staged accumulated, will call onRunUpdate after timeout');
       }
 
       if (hasFailed) {
         setFailedDiceDisplay(resp.action_result.info.failed_dice);
-        setTimeout(() => { setFailedDiceDisplay(null); setStagedDice([]); onRunUpdate(resp); }, 1200);
+        setTimeout(() => {
+          console.log('[handleCollect] timeout fired → calling onRunUpdate', resp);
+          setFailedDiceDisplay(null);
+          setStagedDice([]);
+          onRunUpdate(resp);
+        }, 1200);
       } else {
+        console.log('[handleCollect] calling onRunUpdate immediately');
         onRunUpdate(resp);
       }
-    } catch (e) { if (onError) onError(e); else console.error(e); }
+    } catch (e) {
+      console.error('[handleCollect] ERROR', e);
+      if (onError) onError(e); else console.error(e);
+    }
   }
 
   async function handleSkip() {
@@ -217,14 +250,14 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
         border: `1px solid ${C.border}`,
         borderRadius: 6,
       }}>
-        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>
+        <span style={{ color: C.muted, fontSize: 15, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>
           Turns
         </span>
         <div style={{ display: 'flex', gap: 5 }}>
           {Array.from({ length: run.upgrade_turns_max }, (_, i) => (
             <div key={i} style={{
-              width: 14,
-              height: 14,
+              width: 15,
+              height: 15,
               borderRadius: '50%',
               background: i < turnsRemaining
                 ? `radial-gradient(circle, ${C.gold} 30%, ${C.bronze} 100%)`
@@ -235,7 +268,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             }} />
           ))}
         </div>
-        <span style={{ color: C.gold, fontWeight: '600', fontSize: 13, fontFamily: 'monospace' }}>
+        <span style={{ color: C.gold, fontWeight: '600', fontSize: 16, fontFamily: 'monospace' }}>
           {turnsRemaining}
         </span>
       </div>
@@ -320,7 +353,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
       </div>
 
       {/* === ACTIONS === */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center', minHeight: 40 }}>
         {run.free_reroll_available && !selectedNumber && !hasSkipOnly && (
           <Btn
             color={C.purple}
@@ -337,6 +370,26 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             }}
           >
             Free Reroll
+          </Btn>
+        )}
+
+        {run.retry_die_available && !selectedNumber && !hasSkipOnly &&
+          selectedIndices.length === 1 && diceTypes[selectedIndices[0]] === 'retry' && (
+          <Btn
+            color='#4A8A20'
+            disabled={retrying}
+            style={{ fontSize: 12 }}
+            onClick={async () => {
+              setRetrying(true);
+              setSelectedIndices([]);
+              try {
+                const resp = await rpgApi.upgradeRetryReroll(runId);
+                onRunUpdate(resp);
+              } catch (e) { if (onError) onError(e); else console.error(e); }
+              setRetrying(false);
+            }}
+          >
+            Retry Die
           </Btn>
         )}
 
@@ -413,7 +466,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
               <div key={n} style={{
                 background: removed ? '#0A0604' : `rgba(30,18,8,0.8)`,
                 borderRadius: 5,
-                padding: '6px 4px',
+                padding: '9px 6px',
                 textAlign: 'center',
                 border: `1px solid ${removed ? C.borderDim : statColor + '44'}`,
                 opacity: removed ? 0.4 : 1,
@@ -421,12 +474,12 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 cursor: 'help',
               }} title={tooltipLines}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 11, color: removed ? C.mutedDim : statColor, fontFamily: 'monospace', fontWeight: '600' }}>
+                  <span style={{ fontSize: 14, color: removed ? C.mutedDim : statColor, fontFamily: 'monospace', fontWeight: '600' }}>
                     {n}
                   </span>
                 </div>
                 <div style={{
-                  fontSize: 8,
+                  fontSize: 10,
                   color: removed ? C.mutedDim : statColor,
                   marginBottom: 4,
                   whiteSpace: 'nowrap',
@@ -439,15 +492,17 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 <div style={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
                   {Array.from({ length: target }, (_, j) => (
                     <div key={j} style={{
-                      width: Math.max(4, Math.floor(36 / target)),
-                      height: 12,
+                      width: Math.max(12, Math.floor(96 / target)),
+                      height: 19,
                       borderRadius: 2,
                       background: removed
                         ? '#1A0C04'
                         : j < count
                         ? statColor
                         : '#1A0A04',
-                      border: `1px solid ${removed ? C.borderDim : (j < count ? statColor + '88' : C.borderDim)}`,
+                      border: j === thresholdAt - 1 && !removed
+                        ? `1px solid ${statColor}aa`
+                        : `1px solid ${removed ? C.borderDim : (j < count ? statColor + '88' : C.borderDim)}`,
                       boxShadow: j < count && !removed ? `0 0 4px ${statColor}44` : 'none',
                       transition: 'all 0.3s',
                     }} />
@@ -455,7 +510,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                 </div>
                 {/* Threshold marker */}
                 {!removed && (
-                  <div style={{ fontSize: 8, color: count >= thresholdAt ? statColor : C.mutedDim, marginTop: 2, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 12, color: count >= thresholdAt ? statColor : C.mutedDim, marginTop: 2, fontFamily: 'monospace' }}>
                     {count}/{target}
                   </div>
                 )}

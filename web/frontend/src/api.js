@@ -50,7 +50,7 @@ export const api = {
 
 export const rpgApi = {
   /** Start a new RPG run. */
-  newRun: () => request('POST', '/rpg/new'),
+  newRun: (name = 'Anonymous') => request('POST', '/rpg/new', { name }),
 
   /** Get full run state. */
   getState: (runId) => request('GET', `/rpg/${runId}/state`),
@@ -64,6 +64,9 @@ export const rpgApi = {
 
   /** Free reroll — re-rolls all dice without costing a turn (requires forge). */
   upgradeReroll: (runId) => request('POST', `/rpg/${runId}/upgrade/reroll`),
+
+  /** Retry die reroll — rerolls only the retry die without costing a turn (once per turn). */
+  upgradeRetryReroll: (runId) => request('POST', `/rpg/${runId}/upgrade/retry-reroll`),
 
   /** Apply upgrades and move to combat phase. */
   upgradeFinish: (runId) => request('POST', `/rpg/${runId}/upgrade/finish`),
@@ -94,4 +97,23 @@ export const rpgApi = {
 
   /** Wipe all run history. */
   clearHistory: () => request('DELETE', '/rpg/history'),
+
+  /** Enter the Gladiator Showdown after a victorious run with a key. */
+  gladiatorEnter: (runId) => request('POST', `/rpg/${runId}/gladiator/enter`),
+};
+
+// ---------------------------------------------------------------------------
+// Gladiator API
+// ---------------------------------------------------------------------------
+
+export const gladiatorApi = {
+  /** Check whether the showdown pool is large enough to be active. */
+  getStatus: () => request('GET', '/gladiator/status'),
+
+  /** Get the leaderboard (all completed gauntlet runs, best wins first). */
+  getLeaderboard: () => request('GET', '/gladiator/leaderboard'),
+
+  /** Simulate the next fight in a gauntlet session. */
+  fight: (gauntletId, skip = false) =>
+    request('POST', `/gladiator/${gauntletId}/fight`, { skip }),
 };

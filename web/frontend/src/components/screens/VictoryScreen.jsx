@@ -1,7 +1,32 @@
+import { useState } from 'react';
+import { rpgApi, gladiatorApi } from '../../api.js';
 import { C } from '../../theme.js';
 import { Btn } from '../ui/Btn.jsx';
 
-export function VictoryScreen({ run, onRestart }) {
+export function VictoryScreen({ run, runId, onRestart, onGauntlet }) {
+  const [gladLoading, setGladLoading] = useState(false);
+  const [gladError, setGladError]     = useState(null);
+  const [statusMsg, setStatusMsg]     = useState(null);
+
+  const hasKey = run.player.has_gladiator_key;
+
+  async function enterShowdown() {
+    setGladLoading(true);
+    setGladError(null);
+    try {
+      const status = await gladiatorApi.getStatus();
+      if (!status.active) {
+        setStatusMsg(`Showdown locked — only ${status.character_count} of ${status.required} champions registered.`);
+        setGladLoading(false);
+        return;
+      }
+      const gauntlet = await rpgApi.gladiatorEnter(runId);
+      onGauntlet(gauntlet);
+    } catch (e) {
+      setGladError(e.message || 'Could not enter the showdown.');
+    }
+    setGladLoading(false);
+  }
   return (
     <div style={{
       display: 'flex',
@@ -98,6 +123,44 @@ export function VictoryScreen({ run, onRestart }) {
         }}>
           {Math.round(run.player.current_hp)} HP remaining
         </div>
+
+        {/* Gladiator Showdown entry */}
+        {hasKey && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{
+              fontSize: 11, color: C.gold, letterSpacing: 2,
+              textTransform: 'uppercase', marginBottom: 10, opacity: 0.8,
+            }}>
+              ⚔ Gladiator Showdown
+            </div>
+            {statusMsg && (
+              <div style={{ color: C.muted, fontSize: 11, marginBottom: 8 }}>{statusMsg}</div>
+            )}
+            {gladError && (
+              <div style={{ color: C.scarlet, fontSize: 11, marginBottom: 8 }}>{gladError}</div>
+            )}
+            <Btn
+              onClick={enterShowdown}
+              disabled={gladLoading}
+              color={C.crimson}
+              style={{ fontSize: 12, padding: '8px 20px', letterSpacing: 1, marginBottom: 8, width: '100%' }}
+            >
+              {gladLoading ? 'Entering…' : 'Enter the Showdown'}
+            </Btn>
+          </div>
+        )}
+
+        {!hasKey && (
+          <div style={{
+            color: C.muted, fontSize: 11, marginBottom: 16,
+            padding: '6px 10px',
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: 4,
+            border: `1px solid ${C.borderDim}`,
+          }}>
+            No Gladiator Key — run not recorded.
+          </div>
+        )}
 
         <br />
         <Btn onClick={onRestart} color={C.gold} style={{ fontSize: 13, color: C.dark }}>
