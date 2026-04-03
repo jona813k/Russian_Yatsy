@@ -13,4 +13,4 @@ cmds = [
 cmds = ["cd web/frontend && npm run build"]
 
 [start]
-cmd = "/opt/venv/bin/uvicorn web.backend.main:app --host 0.0.0.0 --port $PORT"
+cmd = "/opt/venv/bin/uvicorn web.backend.main:app --host 0.0.0.0 --port $PORT --app-dir /app"
