@@ -3,6 +3,19 @@ import { C } from '../../theme.js';
 import { Btn } from './Btn.jsx';
 import { debugApi } from '../../api.js';
 
+const LOG_LINE_MAX = 300;
+const LOG_SKIP_PATTERNS = [
+  '[UpgradePhase] render',   // full state dump on every render
+  '[handleCollect] response', // full run state in response log
+  '[handleCollect] timeout fired', // same, on timeout
+];
+
+function filterLogs(logs) {
+  return logs
+    .filter(line => !LOG_SKIP_PATTERNS.some(p => line.includes(p)))
+    .map(line => line.length > LOG_LINE_MAX ? line.slice(0, LOG_LINE_MAX) + '…' : line);
+}
+
 function buildRunState(run, runId) {
   if (!run || !runId) return {};
   const p = run.player ?? {};
@@ -53,7 +66,7 @@ export function BugReportModal({ run, runId, onClose }) {
       await debugApi.submitBugReport({
         description:  description.trim(),
         run_state:    buildRunState(run, runId),
-        console_logs: window.__consoleLogs ?? [],
+        console_logs: filterLogs(window.__consoleLogs ?? []),
         browser:      navigator.userAgent,
         url:          window.location.href,
       });

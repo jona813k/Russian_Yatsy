@@ -440,10 +440,11 @@ class RPGRun:
 
         self._summon_hp_carry = None
 
+        self.player.current_hp = combat['player_hp_remaining']
+
         if combat['result'] == 'lose':
             self.phase = 'game_over'
         else:
-            self.player.current_hp = combat['player_hp_remaining']
             if self.current_enemy['is_boss']:
                 if self.level_idx >= 2:
                     self.phase = 'victory'

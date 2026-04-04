@@ -553,6 +553,26 @@ def get_bug_reports():
         raise HTTPException(status_code=500, detail="Could not read bug reports")
 
 
+@app.patch("/api/debug/bug-report/{report_id}/resolve")
+def resolve_bug_report(report_id: str):
+    """Mark a bug report as resolved."""
+    if not _BUG_REPORTING_ENABLED:
+        raise HTTPException(status_code=403, detail="Bug reporting is not enabled in this environment")
+    if not BUG_REPORTS_FILE.exists():
+        raise HTTPException(status_code=404, detail="No bug reports found")
+    try:
+        reports = json.loads(BUG_REPORTS_FILE.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(status_code=500, detail="Could not read bug reports")
+    for r in reports:
+        if r['id'] == report_id:
+            r['status'] = 'resolved'
+            BUG_REPORTS_FILE.write_text(json.dumps(reports, indent=2), encoding='utf-8')
+            logger.info('[bug-report] resolved id=%s', report_id)
+            return {'id': report_id, 'status': 'resolved'}
+    raise HTTPException(status_code=404, detail="Report not found")
+
+
 @app.post("/api/debug/bug-report")
 def submit_bug_report(body: BugReportRequest):
     """Save a bug report to disk. Only active on Railway (RAILWAY_ENVIRONMENT is set)."""
