@@ -209,9 +209,9 @@ export function ShopScreen({ run, runId, onRunUpdate, onError }) {
       <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {items.map(item => {
           const alreadyOwned = owned.includes(item.id);
-          const isPotion = item.id === 'heal_potion';
+          const isGoldOnly = item.id === 'heal_potion' || item.id === 'gladiator_key';
           const canBuyGold = !alreadyOwned && run.player.gold >= item.cost;
-          const canFree = !alreadyOwned && !isPotion && freepicks > 0;
+          const canFree = !alreadyOwned && !isGoldOnly && freepicks > 0;
           return (
             <ItemRow
               key={item.id}

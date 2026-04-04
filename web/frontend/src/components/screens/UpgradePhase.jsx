@@ -15,18 +15,23 @@ const DIE_STAT_LABELS = {
 };
 
 const UPGRADE_INFO = {
-  1:  { perDie:'+3% speed',   bonus:'+3% at 4' },
-  2:  { perDie:'+1 dmg',      bonus:'+1 at 4' },
-  3:  { perDie:'+1% crit',    bonus:'+1% at 4' },
-  4:  { perDie:'+2% armor',   bonus:'+2% at 4' },
-  5:  { perDie:'+5 HP',       bonus:'+5 at 4' },
-  6:  { perDie:null,           bonus:'+slot at 4 / +pick at 6' },
-  7:  { perDie:'+20 gold',    bonus:'+20g at 4' },
-  8:  { perDie:'+1 summon',   bonus:'+1 at 4' },
-  9:  { perDie:'+1 spell',    bonus:'+1 at 4' },
-  10: { perDie:'+2% block',   bonus:'+2% at 3' },
-  11: { perDie:'+1% LS',      bonus:'+1% at 3' },
-  12: { perDie:'+1 dark',     bonus:'+1 at 3' },
+  1:  { desc: 'Attack Speed — reduces time between attacks. Faster speed means more hits per second.',   perDie: '+3% attack speed per die collected', bonus: 'Bonus at threshold: +3% extra speed' },
+  2:  { desc: 'Damage — flat bonus added to every attack.',                                              perDie: '+1 attack damage per die collected',  bonus: 'Bonus at threshold: +1 extra damage' },
+  3:  { desc: 'Crit Chance — probability each attack deals double damage.',                              perDie: '+1% crit chance per die collected',   bonus: 'Bonus at threshold: +1% extra crit' },
+  4:  { desc: 'Armor — reduces all incoming damage by a flat percentage.',                               perDie: '+2% armor per die collected',         bonus: 'Bonus at threshold: +2% extra armor' },
+  5:  { desc: 'HP — increases your maximum health pool.',                                                perDie: '+5 max HP per die collected',         bonus: 'Bonus at threshold: +5 extra HP' },
+  6:  { desc: 'Research — unlocks item slots and free shop picks, letting you equip more items.',        perDie: 'No per-die stat gain',                bonus: 'Threshold: +1 item slot at 4 / +1 free pick at 6' },
+  7:  { desc: 'Gold — bonus gold earned after every fight, used to buy items in the shop.',              perDie: '+20 gold per die collected',          bonus: 'Bonus at threshold: +20 extra gold' },
+  8:  { desc: 'Summon — summons a creature that fights alongside you, absorbing hits and dealing damage.', perDie: '+1 summon level per die collected',  bonus: 'Bonus at threshold: +1 extra level' },
+  9:  { desc: 'Spell — casts a damage spell every 4 seconds during combat.',                             perDie: '+1 spell level per die collected',    bonus: 'Bonus at threshold: +1 extra level' },
+  10: { desc: 'Block — chance to completely nullify an incoming enemy attack.',                          perDie: '+2% block chance per die collected',  bonus: 'Bonus at threshold: +2% extra block' },
+  11: { desc: 'Life Steal — percentage of damage dealt that is restored as HP.',                        perDie: '+1% lifesteal per die collected',     bonus: 'Bonus at threshold: +1% extra lifesteal' },
+  12: { desc: 'Dark — multiplies damage based on how many hits you have landed. Ramps up over time.',   perDie: '+1 dark level per die collected',     bonus: 'Bonus at threshold: +1 extra dark level' },
+};
+
+const DIE_TYPE_COLORS = {
+  d12: '#7A3A9A', d3: '#8A7A20', risky: '#8B1A1A', retry: '#4A8A20',
+  logic: '#207880', '2_5': '#6A30A0', mirror: '#2060A0', bomb: '#A03010',
 };
 
 // Stat accent colors
@@ -322,23 +327,26 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                   Stash
                 </span>
                 <div style={{ width: 1, height: 16, background: C.borderDim, flexShrink: 0 }} />
-                {stagedDice.map((d, i) => (
-                  <div key={i} style={{
-                    width: 22, height: 22,
-                    borderRadius: 4,
-                    background: 'rgba(92,58,16,0.25)',
-                    border: `1px solid ${C.border}66`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 10,
-                    color: C.muted,
-                    fontFamily: 'monospace',
-                    fontWeight: '600',
-                  }}>
-                    {d.value}
-                  </div>
-                ))}
+                {stagedDice.map((d, i) => {
+                  const typeColor = DIE_TYPE_COLORS[d.dieType] || C.border;
+                  return (
+                    <div key={i} style={{
+                      width: 22, height: 22,
+                      borderRadius: 4,
+                      background: `${typeColor}22`,
+                      border: `1px solid ${typeColor}99`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      color: typeColor,
+                      fontFamily: 'monospace',
+                      fontWeight: '600',
+                    }}>
+                      {d.value}
+                    </div>
+                  );
+                })}
               </>
             )}
           </div>
@@ -425,7 +433,7 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
 
       {/* === PROGRESS GRID (carved stone tablet style) === */}
       <div style={{
-        background: `linear-gradient(180deg, #1A0C04, #130804)`,
+        background: `linear-gradient(180deg, #261408, #1C1008)`,
         border: `1px solid ${C.border}`,
         borderRadius: 8,
         overflow: 'hidden',
@@ -461,16 +469,18 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
             const baseThreshold = n >= 10 ? 3 : 4;
             const thresholdAt = target !== 6 ? Math.max(1, Math.round(baseThreshold * target / 6)) : baseThreshold;
             const tooltipLines = removed
-              ? 'Removed — no stat gain, but dice still count for pair combinations.'
+              ? `${DIE_STAT_LABELS[n]} — removed by your specialisation.\nDice still count for pair combinations but grant no stat bonus.`
               : [
-                  info.perDie ? `Each die: ${info.perDie}` : null,
-                  `Collect ${thresholdAt}: ${info.bonus}`,
-                  target !== 6 ? `Target: ${target}` : null,
-                ].filter(Boolean).join('\n');
+                  info.desc,
+                  '',
+                  info.perDie,
+                  info.bonus,
+                  target !== 6 ? `Custom target: ${target} (specialisation)` : null,
+                ].filter(l => l !== null).join('\n');
 
             return (
               <div key={n} style={{
-                background: removed ? '#0A0604' : `rgba(30,18,8,0.8)`,
+                background: removed ? '#100804' : `rgba(42,26,10,0.9)`,
                 borderRadius: 5,
                 padding: '9px 6px',
                 textAlign: 'center',
@@ -485,7 +495,8 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                   </span>
                 </div>
                 <div style={{
-                  fontSize: 10,
+                  fontSize: 11,
+                  fontWeight: '700',
                   color: removed ? C.mutedDim : statColor,
                   marginBottom: 4,
                   whiteSpace: 'nowrap',

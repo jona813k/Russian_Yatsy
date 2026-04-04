@@ -25,11 +25,11 @@ function StatRow({ label, value, highlight }) {
       padding: '5px 0',
       borderBottom: `1px solid ${C.borderDim}`,
     }}>
-      <span style={{ color: C.muted, fontSize: 15, fontFamily: "'Cinzel', serif" }}>{label}</span>
+      <span style={{ color: C.textDim, fontSize: 13, fontFamily: "'Cinzel', serif" }}>{label}</span>
       <span style={{
-        color: highlight ? C.yellow : C.textDim,
-        fontWeight: '600',
-        fontSize: 15,
+        color: highlight ? C.yellow : C.sand,
+        fontWeight: '700',
+        fontSize: 13,
         fontFamily: 'monospace',
       }}>
         {value}
@@ -59,14 +59,14 @@ export function PlayerPanel({ player, ownedItems }) {
     <div style={{
       minWidth: 200,
       maxWidth: 220,
-      background: `linear-gradient(180deg, #1E1208, #180C04)`,
+      background: `linear-gradient(180deg, #261A0A, #1E1008)`,
       border: `1px solid ${C.border}`,
       borderRadius: 6,
       overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
-        background: `linear-gradient(90deg, #3A1A08, #2A1004)`,
+        background: `linear-gradient(90deg, #4A2610, #361808)`,
         borderBottom: `1px solid ${C.border}`,
         padding: '8px 12px',
         textAlign: 'center',

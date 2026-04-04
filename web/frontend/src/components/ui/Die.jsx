@@ -50,11 +50,11 @@ const DIE_TYPE_STYLES = {
 };
 
 const STATE_OVERRIDES = {
-  userSelected: { bg: '#3A2A04', border: C.gold,    textColor: '#1A0A04' },
-  preview:      { bg: '#2A2004', border: C.yellow,  textColor: '#1A0A04' },
-  illegal:      { bg: '#0F0804', border: '#2A1808',  textColor: '#3A2A18', opacity: 0.4 },
-  setAside:     { bg: '#1A1008', border: '#3A2808',  textColor: C.muted,   opacity: 0.6 },
-  rolling:      { bg: '#181008', border: C.borderDim, textColor: C.mutedDim },
+  userSelected: { bg: '#3A2A04', border: C.gold,      textColor: '#1A0A04' },
+  preview:      { bg: '#2A2004', border: C.yellow,    textColor: '#1A0A04' },
+  illegal:      { bg: null,      border: null,         textColor: null,     opacity: 0.35 },
+  setAside:     { bg: null,      border: null,         textColor: null,     opacity: 0.55 },
+  rolling:      { bg: '#181008', border: C.borderDim,  textColor: C.mutedDim },
 };
 
 export function Die({ value, state = 'normal', dieType, onClick }) {
