@@ -508,11 +508,14 @@ def rpg_forge_pick(run_id: str, body: ForgeRequest):
     return build_rpg_state(run)
 
 
+class ForgeRerollRequest(BaseModel):
+    choice_id: str
+
 @app.post("/api/rpg/{run_id}/forge/reroll")
-def rpg_forge_reroll(run_id: str):
-    """Spend 50g to swap one shown forge choice for an unseen one."""
+def rpg_forge_reroll(run_id: str, body: ForgeRerollRequest):
+    """Spend 50g to swap a specific shown forge choice for an unseen one."""
     run = get_run(run_id)
-    ok, reason = run.reroll_forge()
+    ok, reason = run.reroll_forge(body.choice_id)
     if not ok:
         raise HTTPException(status_code=400, detail=reason)
     return build_rpg_state(run)

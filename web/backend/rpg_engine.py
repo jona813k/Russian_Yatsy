@@ -105,6 +105,8 @@ def generate_shop_items(level_idx: int = 0, discount: bool = False, owned_ids: l
     tier = level_idx + 1  # level 0→tier1, level 1→tier2, level 2→tier3
     key = next((i for i in SHOP_ITEMS if i['id'] == 'gladiator_key' and i['tier'] == tier), None)
     pool = [i for i in SHOP_ITEMS if i['tier'] == tier and i['id'] != 'gladiator_key']
+    if not pool and tier > 1:
+        pool = [i for i in SHOP_ITEMS if i['tier'] == tier - 1 and i['id'] != 'gladiator_key']
 
     owned_set = set(owned_ids or [])
     already_owned = [i for i in pool if i['id'] in owned_set]
@@ -614,8 +616,8 @@ class RPGRun:
             self.forge_choices = []
         self._forge_shown_ids = {c['id'] for c in self.forge_choices}
 
-    def reroll_forge(self) -> tuple[bool, str]:
-        """Replace one random shown forge option with one not yet shown. Costs 50g."""
+    def reroll_forge(self, replace_id: str) -> tuple[bool, str]:
+        """Replace a specific shown forge option with one not yet shown. Costs 50g."""
         if self.phase != 'forge':
             return False, 'not in forge phase'
         if self.player.gold < 50:
@@ -627,11 +629,12 @@ class RPGRun:
         unseen = [c for c in pool if c['id'] not in self._forge_shown_ids]
         if not unseen:
             return False, 'no more options to reveal'
+        replace_idx = next((i for i, c in enumerate(self.forge_choices) if c['id'] == replace_id), None)
+        if replace_idx is None:
+            return False, 'invalid choice id'
         self.player.gold -= 50
         replacement = random.choice(unseen)
         self._forge_shown_ids.add(replacement['id'])
-        # Replace a random currently-shown choice
-        replace_idx = random.randrange(len(self.forge_choices))
         self.forge_choices[replace_idx] = replacement
         return True, 'ok'
 
