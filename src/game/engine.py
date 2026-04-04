@@ -43,6 +43,10 @@ class GameEngine:
         self.turn_number += 1
         self.total_rolls += 1
 
+    def _target_for(self, number: int) -> int:
+        """Return how many of *number* must be collected to complete it."""
+        return GameRules.TARGET_PER_NUMBER
+
     # ------------------------------------------------------------------
     # Legal-action helpers
     # ------------------------------------------------------------------
@@ -122,7 +126,7 @@ class GameEngine:
                 'info': {'error': f'Cannot make {target} from dice'},
             }
 
-        if self.player.progress.get(target, 0) >= GameRules.TARGET_PER_NUMBER:
+        if self.player.progress.get(target, 0) >= self._target_for(target):
             return {
                 'success': False,
                 'state': 'illegal',

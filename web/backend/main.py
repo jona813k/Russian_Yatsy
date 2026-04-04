@@ -47,7 +47,12 @@ from web.backend.combat import simulate_combat
 
 _DATA_DIR = Path(os.environ.get('DATA_DIR', Path(__file__).parent))
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
-HISTORY_FILE = _DATA_DIR / 'run_history.json'
+HISTORY_FILE     = _DATA_DIR / 'run_history.json'
+BUG_REPORTS_FILE = _DATA_DIR / 'bug_reports.json'
+
+# Bug reporting is only active when running on Railway.
+# RAILWAY_ENVIRONMENT is injected automatically by the Railway platform.
+_BUG_REPORTING_ENABLED = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
 
 def load_history() -> list:
     if HISTORY_FILE.exists():
@@ -410,7 +415,20 @@ def rpg_combat_start(run_id: str):
     """Simulate the combat and return events for animation. Idempotent — safe to call twice."""
     run = get_run(run_id)
     if run.phase == 'combat':
-        combat = run.run_combat()
+        enemy = run.current_enemy
+        logger.info(
+            '[combat/start] run=%s level=%d fight_idx=%d enemy=%s is_boss=%s',
+            run_id, run.level_idx, run.fight_idx, enemy.get('name'), enemy.get('is_boss'),
+        )
+        try:
+            combat = run.run_combat()
+        except Exception:
+            logger.exception('[combat/start] simulate_combat crashed run=%s', run_id)
+            raise
+        logger.info(
+            '[combat/start] result=%s player_hp=%s run_phase_after=%s',
+            combat.get('result'), combat.get('player_hp_remaining'), run.phase,
+        )
         # Save history when the run reaches a terminal state
         if run.phase in ('game_over', 'victory'):
             save_to_history(run.to_summary())
@@ -424,6 +442,7 @@ def rpg_combat_start(run_id: str):
                     items=[i['id'] for i in run.owned_items],
                 )
     elif run.last_combat is not None:
+        logger.info('[combat/start] returning cached last_combat for run=%s', run_id)
         combat = run.last_combat
     else:
         raise HTTPException(status_code=400, detail="Not in combat phase")
@@ -507,6 +526,46 @@ def rpg_history_clear():
     """Wipe all run history."""
     HISTORY_FILE.write_text('[]', encoding='utf-8')
     return {'cleared': True}
+
+
+# ---------------------------------------------------------------------------
+# Bug reporting
+# ---------------------------------------------------------------------------
+
+class BugReportRequest(BaseModel):
+    description: str
+    run_state:   dict = {}
+    console_logs: list = []
+    browser:     str = ''
+    url:         str = ''
+
+@app.post("/api/debug/bug-report")
+def submit_bug_report(body: BugReportRequest):
+    """Save a bug report to disk. Only active on Railway (RAILWAY_ENVIRONMENT is set)."""
+    if not _BUG_REPORTING_ENABLED:
+        raise HTTPException(status_code=403, detail="Bug reporting is not enabled in this environment")
+
+    reports = []
+    if BUG_REPORTS_FILE.exists():
+        try:
+            reports = json.loads(BUG_REPORTS_FILE.read_text(encoding='utf-8'))
+        except (json.JSONDecodeError, OSError):
+            reports = []
+
+    report = {
+        'id':           str(uuid.uuid4()),
+        'timestamp':    datetime.now(timezone.utc).isoformat(),
+        'status':       'open',
+        'description':  body.description,
+        'run_state':    body.run_state,
+        'console_logs': body.console_logs,
+        'browser':      body.browser,
+        'url':          body.url,
+    }
+    reports.insert(0, report)
+    BUG_REPORTS_FILE.write_text(json.dumps(reports, indent=2), encoding='utf-8')
+    logger.info('[bug-report] saved report id=%s description=%r', report['id'], body.description[:80])
+    return {'id': report['id']}
 
 
 # ---------------------------------------------------------------------------

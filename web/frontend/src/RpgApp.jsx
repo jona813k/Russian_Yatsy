@@ -25,6 +25,9 @@ import { HistoryScreen }       from './components/screens/HistoryScreen.jsx';
 
 // Theme
 import { C } from './theme.js';
+import { BugReportModal } from './components/ui/BugReportModal.jsx';
+
+const BUG_REPORTING = import.meta.env.VITE_ENABLE_BUG_REPORTING === 'true';
 
 export default function RpgApp({ onBack }) {
   const [run, setRun]           = useState(null);
@@ -33,6 +36,7 @@ export default function RpgApp({ onBack }) {
   const [error, setError]       = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [gauntlet, setGauntlet] = useState(null);  // active gladiator gauntlet state
+  const [showBugReport, setShowBugReport] = useState(false);
 
   async function startRun(name = 'Anonymous') {
     setLoading(true);
@@ -81,13 +85,36 @@ export default function RpgApp({ onBack }) {
   // ── Start screen ────────────────────────────────────────────────────────
   if (!run) {
     return (
-      <StartScreen
-        onStart={(name) => startRun(name)}
-        onHistory={() => setShowHistory(true)}
-        onBack={onBack}
-        loading={loading}
-        error={error}
-      />
+      <>
+        <StartScreen
+          onStart={(name) => startRun(name)}
+          onHistory={() => setShowHistory(true)}
+          onBack={onBack}
+          loading={loading}
+          error={error}
+        />
+        {BUG_REPORTING && showBugReport && (
+          <BugReportModal run={null} runId={null} onClose={() => setShowBugReport(false)} />
+        )}
+        {BUG_REPORTING && (
+          <button
+            onClick={() => setShowBugReport(true)}
+            style={{
+              position: 'fixed', bottom: 16, right: 16, zIndex: 100,
+              background: 'rgba(15,10,4,0.85)',
+              color: C.muted,
+              border: `1px solid ${C.borderDim}`,
+              borderRadius: 4,
+              padding: '5px 12px',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontFamily: "'Cinzel', serif",
+            }}
+          >
+            🐛 Bug
+          </button>
+        )}
+      </>
     );
   }
 
@@ -157,6 +184,26 @@ export default function RpgApp({ onBack }) {
           >
             History
           </button>
+          {BUG_REPORTING && <button
+            onClick={() => setShowBugReport(true)}
+            title="Report a bug"
+            style={{
+              background: 'transparent',
+              color: C.muted,
+              border: `1px solid ${C.borderDim}`,
+              borderRadius: 4,
+              padding: '5px 12px',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: 1,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.target.style.color = C.scarlet; e.target.style.borderColor = C.crimson; }}
+            onMouseLeave={e => { e.target.style.color = C.muted; e.target.style.borderColor = C.borderDim; }}
+          >
+            🐛 Bug
+          </button>}
           {onBack && (
             <button
               onClick={onBack}
@@ -210,6 +257,10 @@ export default function RpgApp({ onBack }) {
           <RunPath run={run} />
         </div>
       </div>
+
+      {BUG_REPORTING && showBugReport && (
+        <BugReportModal run={run} runId={runId} onClose={() => setShowBugReport(false)} />
+      )}
     </div>
   );
 }

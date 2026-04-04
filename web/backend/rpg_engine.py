@@ -318,13 +318,6 @@ class RPGUpgradeEngine(GameEngine):
         return legal_actions
 
     def _execute_collect(self, target: int) -> dict:
-        # Guard against collecting a stat that's already at its custom target
-        if self.player.progress.get(target, 0) >= self._target_for(target):
-            return {
-                'success': False,
-                'state': 'illegal',
-                'info': {'error': f'{target} already completed'},
-            }
         return super()._execute_collect(target)
 
 

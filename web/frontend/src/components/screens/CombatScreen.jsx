@@ -173,6 +173,8 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
   const [darkStacks, setDarkStacks] = useState({ hitCount: 0, mult: 1.0 });
   const [pendingNext, setPendingNext] = useState(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [combatError, setCombatError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Sprite animation states
   const [playerAnim, setPlayerAnim] = useState('idle');
@@ -189,17 +191,28 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
   const SUMMON_NAMES = { Imp: 'Imp', Wolf: 'Wolf', Orc: 'Orc', Skeleton: 'Skeleton', Dragon: 'Dragon' };
 
   useEffect(() => {
+    hasStarted.current = false;
+  }, [retryCount]);
+
+  useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
     async function runCombat() {
       setLoading(true);
+      setCombatError(null);
       try {
         const resp = await rpgApi.startCombat(runId);
         setLoading(false);
+        if (!resp.combat) {
+          console.error('[CombatScreen] startCombat response missing combat data', resp);
+          setCombatError('Server returned no combat data. Please retry.');
+          return;
+        }
         animateEvents(resp.combat.events, resp);
       } catch (e) {
-        console.error(e);
+        console.error('[CombatScreen] startCombat failed', e);
         setLoading(false);
+        setCombatError(`Combat failed to start: ${e?.message ?? 'unknown error'}. Please retry.`);
       }
     }
     runCombat();
@@ -364,7 +377,19 @@ export function CombatScreen({ run, runId, onRunUpdate, onError }) {
       </div>
 
       {/* === COMBAT LOG === */}
-      {loading ? (
+      {combatError ? (
+        <div style={{ padding: 16, textAlign: 'center' }}>
+          <div style={{ color: C.scarlet, fontSize: 13, fontFamily: "'Cinzel', serif", marginBottom: 12 }}>
+            {combatError}
+          </div>
+          <Btn
+            onClick={() => { setCombatError(null); setRetryCount(c => c + 1); }}
+            color={C.bronze}
+          >
+            Retry
+          </Btn>
+        </div>
+      ) : loading ? (
         <div style={{ color: C.muted, fontSize: 13, padding: 12, fontFamily: "'Cinzel', serif", textAlign: 'center' }}>
           The battle begins…
         </div>
