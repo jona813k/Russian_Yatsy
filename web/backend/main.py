@@ -539,6 +539,20 @@ class BugReportRequest(BaseModel):
     browser:     str = ''
     url:         str = ''
 
+@app.get("/api/debug/bug-reports")
+def get_bug_reports():
+    """Return all saved bug reports, newest first. Only active on Railway."""
+    if not _BUG_REPORTING_ENABLED:
+        raise HTTPException(status_code=403, detail="Bug reporting is not enabled in this environment")
+    if not BUG_REPORTS_FILE.exists():
+        return []
+    try:
+        return json.loads(BUG_REPORTS_FILE.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error('[bug-reports] failed to read file: %s', e)
+        raise HTTPException(status_code=500, detail="Could not read bug reports")
+
+
 @app.post("/api/debug/bug-report")
 def submit_bug_report(body: BugReportRequest):
     """Save a bug report to disk. Only active on Railway (RAILWAY_ENVIRONMENT is set)."""
