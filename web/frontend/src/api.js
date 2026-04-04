@@ -92,6 +92,9 @@ export const rpgApi = {
   forgePick: (runId, choiceId) =>
     request('POST', `/rpg/${runId}/forge/pick`, { choice_id: choiceId }),
 
+  /** Spend 50g to swap one shown forge choice for an unseen one. */
+  forgeReroll: (runId) => request('POST', `/rpg/${runId}/forge/reroll`),
+
   /** Fetch full run history. */
   getHistory: () => request('GET', '/rpg/history'),
 

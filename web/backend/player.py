@@ -45,6 +45,7 @@ class PlayerStats:
     has_crit_to_aspeed: bool   = False  # crit upgrades convert to atk speed
     has_armor_gives_hp: bool   = False  # armor upgrades also give HP (1% → 2 HP)
     has_gold_level_bonus: bool = False  # gold upgrades give +10 extra gold
+    has_summon_upgrade: bool   = False  # summon heals for 10% of damage dealt
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -78,7 +79,7 @@ def apply_upgrades(player: PlayerStats, collections: dict,
         defn = STAT_DEFS[num]
         attr = defn['attr']
 
-        # Special case: research (number 6)
+        # Special case: research (number 7)
         if defn.get('special') == 'research':
             slot_threshold = max(1, int(4 * target / 6 + 0.5))
             free_threshold = target
@@ -132,7 +133,7 @@ def apply_upgrades(player: PlayerStats, collections: dict,
 
         # Armor gives HP bonus (item: armor_hp_ratio)
         if attr == 'armor' and getattr(player, 'has_armor_gives_hp', False):
-            hp_gain = int(gained * 200)
+            hp_gain = int(gained * 100)
             if hp_gain > 0:
                 player.max_hp += hp_gain
                 player.current_hp = min(player.max_hp, player.current_hp + hp_gain)

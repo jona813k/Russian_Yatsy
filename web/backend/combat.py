@@ -73,6 +73,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
     has_spell_fire        = 'spell_fire'       in item_ids
     has_spell_frost       = 'spell_frost'      in item_ids
     has_spell_heal_summon = 'spell_heal_summon' in item_ids
+    has_summon_upgrade    = 'summon_upgrade'    in item_ids
 
     spell_cooldown  = 4.0
     enemy_armor     = enemy.get('armor',     0.0)
@@ -255,11 +256,18 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
                 dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
                 dmg = max(1, int(dmg * dark_mult))
                 enemy_hp[0] = max(0, enemy_hp[0] - dmg)
-                events.append({
+                ev = {
                     'time': t, 'type': 'summon_attack',
                     'dmg': dmg, 'dark_mult': round(dark_mult, 2),
                     'enemy_hp': enemy_hp[0],
-                })
+                }
+                if has_summon_upgrade and summon:
+                    heal = min(int(dmg * 0.10), summon['hp'] - summon_hp[0])
+                    if heal > 0:
+                        summon_hp[0] += heal
+                        ev['summon_heal'] = heal
+                        ev['summon_hp'] = summon_hp[0]
+                events.append(ev)
                 if enemy_hp[0] > 0:
                     push(t + summon['speed'], 'summon_attack')
 

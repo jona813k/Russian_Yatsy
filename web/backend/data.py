@@ -9,8 +9,8 @@ STAT_DEFS = {
     3:  {'attr': 'crit_chance',   'per_die':  0.01, 'threshold':  0.01,  'has_threshold': True},
     4:  {'attr': 'armor',         'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
     5:  {'attr': 'max_hp',        'per_die':  5,    'threshold':  5,     'has_threshold': True},
-    6:  {'attr': 'item_slots',    'per_die':  0,    'threshold':  None,  'has_threshold': False, 'special': 'research'},
-    7:  {'attr': 'gold',          'per_die':  20,   'threshold':  20,    'has_threshold': True},
+    6:  {'attr': 'gold',          'per_die':  20,   'threshold':  20,    'has_threshold': True},
+    7:  {'attr': 'item_slots',    'per_die':  0,    'threshold':  None,  'has_threshold': False, 'special': 'research'},
     8:  {'attr': 'summon_level',  'per_die':  1,    'threshold':  1,     'has_threshold': True},
     9:  {'attr': 'spell_level',   'per_die':  1,    'threshold':  1,     'has_threshold': True},
     10: {'attr': 'block_chance',  'per_die':  0.02, 'threshold':  0.02,  'has_threshold': True},
@@ -67,7 +67,7 @@ SHOP_ITEMS = [
     {'id': 'armor_flat',       'name': 'Iron Plate',          'tier': 1, 'cost': 100,
      'desc': '+10% permanent armor.'},
     {'id': 'armor_hp_ratio',   'name': 'Bulwark Rune',        'tier': 1, 'cost': 100,
-     'desc': 'Gaining armor upgrades also gives HP (1% armor → 2 HP).'},
+     'desc': 'Gaining armor upgrades also gives HP (1% armor → 1 HP).'},
     {'id': 'shop_free_reroll', 'name': 'Oracle Lens',         'tier': 1, 'cost': 100,
      'desc': 'Future shops and forges each have 1 free reroll.'},
     {'id': 'item_discount',    'name': 'Merchant Badge',      'tier': 1, 'cost': 100,
@@ -92,7 +92,7 @@ SHOP_ITEMS = [
      'desc': 'Grants entry to the Gladiator Showdown after a victorious run. '
              'Without this key your run will not be recorded.'},
 
-    # ── Tier 2 — second and third pre-boss shops ───────────────────────────
+    # ── Tier 2 — second pre-boss shop ─────────────────────────────────────
     {'id': 'atk_execute',      'name': 'Finishing Blade',     'tier': 2, 'cost': 100,
      'desc': '+15 attack damage when the enemy is below 20% HP.'},
     {'id': 'armor_pen',        'name': 'Armor Shredder',      'tier': 2, 'cost': 100,
@@ -102,7 +102,7 @@ SHOP_ITEMS = [
     {'id': 'crit_to_aspeed',   'name': 'Swiftcrit Rune',      'tier': 2, 'cost': 100,
      'desc': 'Future crit upgrades convert to attack speed instead.'},
     {'id': 'crit_freeze',      'name': 'Frostcrit Gem',       'tier': 2, 'cost': 100,
-     'desc': 'Crits freeze the enemy, slowing their attack speed by 50% for 2s.'},
+     'desc': 'Crits freeze the enemy, slowing their attack speed by 30% for 2s.'},
     {'id': 'crit_lifesteal',   'name': 'Crimson Fang',        'tier': 2, 'cost': 100,
      'desc': 'Crits heal for the bonus crit damage. Disables normal lifesteal.'},
     {'id': 'armor_to_spell',   'name': 'Arcane Dissolution',  'tier': 2, 'cost': 100,
@@ -111,19 +111,24 @@ SHOP_ITEMS = [
      'desc': 'Gain attack equal to 5% of your max HP.'},
     {'id': 'hp_double_armor',  'name': 'Ironflesh Pact',      'tier': 2, 'cost': 100,
      'desc': 'Double your max HP and gain -30% armor.'},
-    {'id': 'research_2slots',  'name': "Scholar's Tome",      'tier': 2, 'cost': 100,
-     'desc': 'Gain 2 item slots and 2 free item credits.'},
+    {'id': 'research_2slots',  'name': "Scholar's Tome",      'tier': 1, 'cost': 100,
+     'desc': 'Gain 3 item slots.'},
     {'id': 'summon_upgrade',   'name': "Summoner's Codex",    'tier': 2, 'cost': 100,
-     'desc': 'Upgrade summon abilities: enrage at 35% HP, spell vamp 15%, dragon aura 10%.'},
+     'desc': 'Your summon heals itself for 10% of the damage it deals (lifesteal).'},
     {'id': 'spell_fire',       'name': 'Flame Rune',          'tier': 2, 'cost': 100,
      'desc': 'Your spell burns enemies for 10% of spell damage per second over 3s.'},
     {'id': 'spell_frost',      'name': 'Frost Staff',         'tier': 2, 'cost': 100,
-     'desc': 'Your spell slows enemy attack speed by 50% for 3s.'},
+     'desc': 'Your spell slows enemy attack speed by 30% for 3s.'},
     {'id': 'spell_heal_summon','name': 'Life Conduit',        'tier': 2, 'cost': 100,
      'desc': 'Your spell heals your summon instead of damaging (1 heal per 2 spell dmg).'},
     {'id': 'armor_to_block',   'name': 'Shield Conversion',   'tier': 2, 'cost': 100,
      'desc': 'Convert all armor to block (1% armor → 0.5% block).'},
-    {'id': 'gladiator_key',    'name': 'Gladiator Key',        'tier': 2, 'cost': 100,
+    {'id': 'gladiator_key',    'name': 'Gladiator Key',        'tier': 2, 'cost': 150,
+     'desc': 'Grants entry to the Gladiator Showdown after a victorious run. '
+             'Without this key your run will not be recorded.'},
+
+    # ── Tier 3 — third pre-boss shop ──────────────────────────────────────
+    {'id': 'gladiator_key',    'name': 'Gladiator Key',        'tier': 3, 'cost': 200,
      'desc': 'Grants entry to the Gladiator Showdown after a victorious run. '
              'Without this key your run will not be recorded.'},
 ]
@@ -148,12 +153,11 @@ FORGE_LEVELS = [
             'icon': '🟢',
         },
         {
-            'id':   'dice_plus_one',
-            'name': 'Sharpened Dice',
-            'desc': 'All your normal d6s permanently roll +1 higher '
-                    '(2–7 instead of 1–6), pushing them into '
-                    'mid and high stat territory.',
-            'icon': '⬆️',
+            'id':   'add_bomb_die',
+            'name': 'Bomb Die',
+            'desc': 'Extra die that auto-stashes its value at '
+                    'the start of every turn — if not collected on the first roll it is stashed automatically.',
+            'icon': '💣',
         },
         {
             'id':   'add_2_5_die',
@@ -200,7 +204,7 @@ FORGE_LEVELS = [
             'id':   'loaded_high',
             'name': 'Load: High Numbers',
             'desc': 'All normal dice are weighted toward high faces. '
-                    'Each d6 has 3× more chance to roll 4, 5, or 6 '
+                    'Each d6 has 2× more chance to roll 4, 5, or 6 '
                     'than 1, 2, or 3.',
             'icon': '⬆️',
         },
@@ -208,7 +212,7 @@ FORGE_LEVELS = [
             'id':   'loaded_low',
             'name': 'Load: Low Numbers',
             'desc': 'All normal dice are weighted toward low faces. '
-                    'Each d6 has 3× more chance to roll 1, 2, or 3 '
+                    'Each d6 has 2× more chance to roll 1, 2, or 3 '
                     'than 4, 5, or 6.',
             'icon': '⬇️',
         },
@@ -221,11 +225,12 @@ FORGE_LEVELS = [
             'icon': '🪞',
         },
         {
-            'id':   'add_bomb_die',
-            'name': 'Bomb Die',
-            'desc': 'Add a 6-sided die that auto-stashes its value at '
-                    'the end of every turn — even if you never picked it.',
-            'icon': '💣',
+            'id':   'dice_plus_one',
+            'name': 'Sharpened Dice',
+            'desc': 'All your normal d6s permanently roll +1 higher '
+                    '(2–7 instead of 1–6), pushing them into '
+                    'mid and high stat territory.',
+            'icon': '⬆️',
         },
     ],
 ]

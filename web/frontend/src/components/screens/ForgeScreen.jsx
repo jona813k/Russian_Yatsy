@@ -31,26 +31,33 @@ function ForgeRow({ choice, onPick, loading }) {
         {choice.icon}
       </span>
 
-      {/* Name + desc */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          color: C.yellow,
-          fontWeight: '600',
-          fontSize: 12,
-          fontFamily: "'Cinzel', serif",
-          letterSpacing: 0.5,
-        }}>
-          {choice.name}
-        </span>
-        <span style={{
+      {/* Name */}
+      <span style={{
+        flex: 1,
+        color: C.yellow,
+        fontWeight: '600',
+        fontSize: 13,
+        fontFamily: "'Cinzel', serif",
+        letterSpacing: 0.5,
+      }}>
+        {choice.name}
+      </span>
+
+      {/* Info icon */}
+      <span
+        title={choice.desc}
+        onClick={e => e.stopPropagation()}
+        style={{
+          flexShrink: 0,
           color: C.muted,
-          fontSize: 11,
-          fontFamily: "'Cinzel', serif",
-          marginLeft: 8,
-        }}>
-          — {choice.desc}
-        </span>
-      </div>
+          fontSize: 14,
+          cursor: 'help',
+          lineHeight: 1,
+          padding: '0 4px',
+        }}
+      >
+        ℹ
+      </span>
 
       {/* Button */}
       <button
@@ -81,11 +88,21 @@ function ForgeRow({ choice, onPick, loading }) {
 export function ForgeScreen({ run, runId, onRunUpdate, onError }) {
   const [loading, setLoading] = useState(false);
   const choices = run.forge_choices || [];
+  const gold = run.player?.gold ?? 0;
 
   async function pick(choiceId) {
     setLoading(true);
     try {
       const resp = await rpgApi.forgePick(runId, choiceId);
+      onRunUpdate(resp);
+    } catch (e) { if (onError) onError(e); else console.error(e); }
+    setLoading(false);
+  }
+
+  async function reroll() {
+    setLoading(true);
+    try {
+      const resp = await rpgApi.forgeReroll(runId);
       onRunUpdate(resp);
     } catch (e) { if (onError) onError(e); else console.error(e); }
     setLoading(false);
@@ -121,6 +138,27 @@ export function ForgeScreen({ run, runId, onRunUpdate, onError }) {
         <span style={{ color: C.muted, fontSize: 11, fontFamily: "'Cinzel', serif", marginLeft: 4 }}>
           — the champion has fallen. Pick one gift.
         </span>
+        <button
+          onClick={reroll}
+          disabled={loading || gold < 50}
+          title={gold < 50 ? 'Need 50g to reroll' : 'Replace one choice with an unseen option'}
+          style={{
+            marginLeft: 'auto',
+            background: gold >= 50 ? 'rgba(122,58,154,0.4)' : 'rgba(60,40,80,0.3)',
+            color: gold >= 50 ? C.sand : C.muted,
+            border: `1px solid ${gold >= 50 ? C.purple : C.purple + '44'}`,
+            borderRadius: 4,
+            padding: '3px 10px',
+            fontSize: 11,
+            fontFamily: "'Cinzel', serif",
+            fontWeight: '600',
+            letterSpacing: 0.5,
+            cursor: loading || gold < 50 ? 'default' : 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Reroll (50g)
+        </button>
       </div>
 
       {/* Choice rows */}

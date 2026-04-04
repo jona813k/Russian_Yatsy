@@ -335,13 +335,8 @@ def rpg_upgrade_select(run_id: str, body: SelectRequest):
         raise HTTPException(status_code=400, detail=f"{body.number} is not a legal move")
 
     action = next(a for a in legal if a.get('number') == body.number)
-    # Capture bomb die value before collection/re-roll (for auto-stash on turn_end)
-    run.note_bomb_die_value()
     # Notify the roller which types survive this collection before the engine re-rolls
     run._dice_roller.prepare_for_collection(engine.state.dice_values, body.number)
-    # If the bomb die was consumed by this collection, cancel the pending stash
-    if 'bomb' not in run._dice_roller.types_in_hand:
-        run._bomb_stash_pending = None
     result = engine.execute_action(action)
     run.handle_action_result(result)
 
@@ -363,8 +358,6 @@ def rpg_upgrade_skip(run_id: str):
     if not skip:
         raise HTTPException(status_code=400, detail="No skip available")
 
-    # Capture bomb die value before the turn ends (skip always causes turn_end)
-    run.note_bomb_die_value()
     result = engine.execute_action(skip)
     run.handle_action_result(result)
 
@@ -510,6 +503,16 @@ def rpg_forge_pick(run_id: str, body: ForgeRequest):
     if run.phase != 'forge':
         raise HTTPException(status_code=400, detail="Not in forge phase")
     ok, reason = run.pick_forge(body.choice_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=reason)
+    return build_rpg_state(run)
+
+
+@app.post("/api/rpg/{run_id}/forge/reroll")
+def rpg_forge_reroll(run_id: str):
+    """Spend 50g to swap one shown forge choice for an unseen one."""
+    run = get_run(run_id)
+    ok, reason = run.reroll_forge()
     if not ok:
         raise HTTPException(status_code=400, detail=reason)
     return build_rpg_state(run)

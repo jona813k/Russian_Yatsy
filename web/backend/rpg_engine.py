@@ -31,7 +31,7 @@ from .combat import simulate_combat, get_summon_stats
 HEAL_POTION = {
     'id':   'heal_potion',
     'name': 'Heal Potion',
-    'desc': 'Restore 50% of your missing HP.',
+    'desc': 'Restore 50 HP.',
     'cost': 50,
     'icon': '🧪',
 }
@@ -39,7 +39,7 @@ HEAL_POTION = {
 
 _STAT_NAMES = {
     1:'Speed', 2:'Damage', 3:'Crit', 4:'Armor', 5:'HP',
-    8:'Summon', 9:'Spell', 10:'Block', 11:'Life Steal',
+    6:'Gold', 7:'Research', 8:'Summon', 9:'Spell', 10:'Block', 11:'Life Steal',
 }
 
 def generate_pre_game_forge() -> list:
@@ -48,7 +48,7 @@ def generate_pre_game_forge() -> list:
     from the pool of Split Focus, Specialist, Drop X, Drop A.
       x, z, y, w  — 4 distinct stats from 1-5
       a, b        — 2 distinct stats from 8-11
-    Stats 6 (Research), 7 (Gold), 12 (Dark) are excluded.
+    Stats 6 (Gold), 7 (Research), 12 (Dark) are excluded.
     """
     low  = random.sample([1, 2, 3, 4, 5], 4)   # x, z, y, w
     high = random.sample([8, 9, 10, 11],  2)    # a, b
@@ -99,18 +99,25 @@ def generate_pre_game_forge() -> list:
     ]
 
 
-def generate_shop_items(level_idx: int = 0, discount: bool = False) -> list:
-    """Return 3 random tier-appropriate items + the always-available Heal Potion.
-    The Gladiator Key is always included as a guaranteed slot."""
-    tier = 1 if level_idx == 0 else 2
+def generate_shop_items(level_idx: int = 0, discount: bool = False, owned_ids: list = None) -> list:
+    """Return 3 random tier-appropriate items + heal potion + the Gladiator Key.
+    Items the player already owns are included so they remain visible (greyed out)."""
+    tier = level_idx + 1  # level 0→tier1, level 1→tier2, level 2→tier3
     key = next((i for i in SHOP_ITEMS if i['id'] == 'gladiator_key' and i['tier'] == tier), None)
     pool = [i for i in SHOP_ITEMS if i['tier'] == tier and i['id'] != 'gladiator_key']
-    items = random.sample(pool, min(3, len(pool)))
+
+    owned_set = set(owned_ids or [])
+    already_owned = [i for i in pool if i['id'] in owned_set]
+    available    = [i for i in pool if i['id'] not in owned_set]
+    fresh = random.sample(available, min(3, len(available)))
+    items = fresh + already_owned
+
     if key:
         items = [key] + items
+    all_items = [HEAL_POTION] + items
     if discount:
-        items = [{**i, 'cost': int(i['cost'] * 0.8)} for i in items]
-    return [HEAL_POTION] + items
+        all_items = [{**i, 'cost': int(i['cost'] * 0.8)} for i in all_items]
+    return all_items
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +353,6 @@ class RPGRun:
         self.forge_choices       = []
         self.free_reroll_available  = False
         self.retry_die_available    = False
-        self._bomb_stash_pending: int | None = None  # bomb die value captured before turn-ending action
         self._summon_hp_carry: int  = None
         self._shop_reroll_used: bool = False
         self.total_collections: dict = {n: 0 for n in range(1, 13)}
@@ -394,22 +400,31 @@ class RPGRun:
         self.last_upgrades = []
         self.free_reroll_available = self.player.has_free_reroll
         self.retry_die_available   = self.player.has_retry_die
+        # Bomb die: stash from the very first roll of this upgrade phase
+        self._stash_bomb_from_current_roll()
+
+    def _stash_bomb_from_current_roll(self):
+        """If the bomb die is in the current roll, stash its value immediately."""
+        if not self.player.has_bomb_die:
+            return
+        types = self._dice_roller.types_in_hand
+        bomb_idx = next((i for i, t in enumerate(types) if t == 'bomb'), None)
+        if bomb_idx is not None:
+            val = self.upgrade_engine.state.dice_values[bomb_idx]
+            self._auto_collect_bomb_value(val)
 
     def handle_action_result(self, result: dict):
         """Call after every upgrade action to track turn usage."""
         state = result.get('state')
         if state == 'turn_end':
-            # Bomb die auto-stash: if bomb die wasn't collected, stash its value now
-            if self._bomb_stash_pending is not None:
-                self._auto_collect_bomb_value(self._bomb_stash_pending)
-                self._bomb_stash_pending = None
             self.upgrade_turns_used += 1
             if self.upgrade_turns_used >= self.upgrade_turns_max:
                 self.upgrade_done = True
             self.free_reroll_available = self.player.has_free_reroll
             self.retry_die_available   = self.player.has_retry_die
+            # Bomb die: stash from the fresh roll that just started
+            self._stash_bomb_from_current_roll()
         elif state == 'completed_number':
-            self._bomb_stash_pending = None
             self.free_reroll_available = self.player.has_free_reroll
             self.retry_die_available   = self.player.has_retry_die
 
@@ -455,7 +470,7 @@ class RPGRun:
                 self.fight_idx += 1
                 next_enemy = LEVELS[self.level_idx]['enemies'][self.fight_idx]
                 if next_enemy['is_boss']:
-                    self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount)
+                    self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount, [i['id'] for i in self.owned_items])
                     self._shop_reroll_used = False
                     self.phase = 'pre_boss_shop'
                 else:
@@ -476,7 +491,7 @@ class RPGRun:
         if item_id == 'heal_potion':
             if self.player.gold < item['cost']:
                 return False, 'not enough gold'
-            heal = (self.player.max_hp - self.player.current_hp) // 2
+            heal = min(50, self.player.max_hp - self.player.current_hp)
             self.player.current_hp += heal
             self.player.gold -= item['cost']
             return True, 'ok'
@@ -523,8 +538,7 @@ class RPGRun:
         elif iid == 'crit_to_aspeed':
             p.has_crit_to_aspeed = True
         elif iid == 'research_2slots':
-            p.item_slots += 2
-            p.free_items += 2
+            p.item_slots += 3
         elif iid == 'armor_to_spell':
             spell_gain = int(p.armor / 0.05)
             p.armor = 0.0
@@ -535,11 +549,13 @@ class RPGRun:
             gain = p.max_hp
             p.max_hp *= 2
             p.current_hp = min(p.max_hp, p.current_hp + gain)
-            p.armor = round(max(0.0, p.armor - 0.30), 4)
+            p.armor = round(p.armor - 0.30, 4)
         elif iid == 'armor_to_block':
             block_gain = round(p.armor * 0.5, 4)
             p.block_chance = round(min(0.95, p.block_chance + block_gain), 4)
             p.armor = 0.0
+        elif iid == 'summon_upgrade':
+            p.has_summon_upgrade = True
         elif iid == 'gladiator_key':
             p.has_gladiator_key = True
 
@@ -555,7 +571,7 @@ class RPGRun:
                 return False, 'not enough gold'
             self.player.gold -= REROLL_COST
         self._shop_reroll_used = True
-        self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount)
+        self.shop_items = generate_shop_items(self.level_idx, self.player.has_item_discount, [i['id'] for i in self.owned_items])
         return True, 'ok'
 
     def close_shop(self):
@@ -590,13 +606,34 @@ class RPGRun:
         forge_idx = self.level_idx
         if forge_idx < len(FORGE_LEVELS):
             pool = FORGE_LEVELS[forge_idx]
-            # Both forges have a pool of 6 — randomly pick 3 each run
             if len(pool) > 3:
                 self.forge_choices = random.sample(pool, 3)
             else:
-                self.forge_choices = pool
+                self.forge_choices = list(pool)
         else:
             self.forge_choices = []
+        self._forge_shown_ids = {c['id'] for c in self.forge_choices}
+
+    def reroll_forge(self) -> tuple[bool, str]:
+        """Replace one random shown forge option with one not yet shown. Costs 50g."""
+        if self.phase != 'forge':
+            return False, 'not in forge phase'
+        if self.player.gold < 50:
+            return False, 'not enough gold'
+        forge_idx = self.level_idx
+        if forge_idx >= len(FORGE_LEVELS):
+            return False, 'no forge available'
+        pool = FORGE_LEVELS[forge_idx]
+        unseen = [c for c in pool if c['id'] not in self._forge_shown_ids]
+        if not unseen:
+            return False, 'no more options to reveal'
+        self.player.gold -= 50
+        replacement = random.choice(unseen)
+        self._forge_shown_ids.add(replacement['id'])
+        # Replace a random currently-shown choice
+        replace_idx = random.randrange(len(self.forge_choices))
+        self.forge_choices[replace_idx] = replacement
+        return True, 'ok'
 
     def pick_forge(self, choice_id: str) -> tuple[bool, str]:
         choice = next((c for c in self.forge_choices if c['id'] == choice_id), None)
@@ -668,20 +705,6 @@ class RPGRun:
         self.upgrade_engine.total_rolls += 1
         return True
 
-    def note_bomb_die_value(self):
-        """
-        Capture the bomb die's current value BEFORE prepare_for_collection / execute_action.
-        If the bomb die is later consumed by the collection, the caller should clear this.
-        """
-        if not self.player.has_bomb_die:
-            self._bomb_stash_pending = None
-            return
-        types = self._dice_roller.types_in_hand
-        bomb_idx = next((i for i, t in enumerate(types) if t == 'bomb'), None)
-        self._bomb_stash_pending = (
-            self.upgrade_engine.state.dice_values[bomb_idx]
-            if bomb_idx is not None else None
-        )
 
     def _auto_collect_bomb_value(self, val: int):
         """Add 1 to the bomb die's value in upgrade progress (respects targets and removals)."""

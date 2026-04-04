@@ -11,7 +11,7 @@ const NUMBER_NAMES = {
 
 const DIE_STAT_LABELS = {
   1:'Spd',2:'Dmg',3:'Crit',4:'Armor',5:'HP',
-  6:'Research',7:'Gold',8:'Summon',9:'Spell',10:'Block',11:'Life Steal',12:'Dark',
+  6:'Gold',7:'Research',8:'Summon',9:'Spell',10:'Block',11:'Life Steal',12:'Dark',
 };
 
 const UPGRADE_INFO = {
@@ -20,8 +20,8 @@ const UPGRADE_INFO = {
   3:  { desc: 'Crit Chance — probability each attack deals double damage.',                              perDie: '+1% crit chance per die collected',   bonus: 'Bonus at threshold: +1% extra crit' },
   4:  { desc: 'Armor — reduces all incoming damage by a flat percentage.',                               perDie: '+2% armor per die collected',         bonus: 'Bonus at threshold: +2% extra armor' },
   5:  { desc: 'HP — increases your maximum health pool.',                                                perDie: '+5 max HP per die collected',         bonus: 'Bonus at threshold: +5 extra HP' },
-  6:  { desc: 'Research — unlocks item slots and free shop picks, letting you equip more items.',        perDie: 'No per-die stat gain',                bonus: 'Threshold: +1 item slot at 4 / +1 free pick at 6' },
-  7:  { desc: 'Gold — bonus gold earned after every fight, used to buy items in the shop.',              perDie: '+20 gold per die collected',          bonus: 'Bonus at threshold: +20 extra gold' },
+  6:  { desc: 'Gold — bonus gold earned after every fight, used to buy items in the shop.',              perDie: '+20 gold per die collected',          bonus: 'Bonus at threshold: +20 extra gold' },
+  7:  { desc: 'Research — unlocks item slots and free shop picks, letting you equip more items.',        perDie: 'No per-die stat gain',                bonus: 'Threshold: +1 item slot at 4 / +1 free pick at 7' },
   8:  { desc: 'Summon — summons a creature that fights alongside you, absorbing hits and dealing damage.', perDie: '+1 summon level per die collected',  bonus: 'Bonus at threshold: +1 extra level' },
   9:  { desc: 'Spell — casts a damage spell every 4 seconds during combat.',                             perDie: '+1 spell level per die collected',    bonus: 'Bonus at threshold: +1 extra level' },
   10: { desc: 'Block — chance to completely nullify an incoming enemy attack.',                          perDie: '+2% block chance per die collected',  bonus: 'Bonus at threshold: +2% extra block' },
