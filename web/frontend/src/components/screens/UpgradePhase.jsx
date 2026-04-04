@@ -474,7 +474,6 @@ export function UpgradePhase({ run, runId, onRunUpdate, onError }) {
                   info.desc,
                   '',
                   info.perDie,
-                  info.bonus,
                   target !== 6 ? `Custom target: ${target} (specialisation)` : null,
                 ].filter(l => l !== null).join('\n');
 
