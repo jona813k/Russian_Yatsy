@@ -152,7 +152,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
             heal = 0
             if crit and has_crit_lifesteal:
                 base_dmg = max(1, int((eff_dmg + guard_bonus + (15 if is_execute else 0))
-                                      * dark_mult * aura_mult * (1 - eff_enemy_armor)))
+                                      * dark_mult * (1 - eff_enemy_armor)))
                 crit_bonus = dmg - base_dmg
                 crit_ls_heal = min(crit_bonus, player.max_hp - player_hp[0])
                 if crit_ls_heal > 0:

@@ -106,6 +106,10 @@ export const rpgApi = {
 // Gladiator API
 // ---------------------------------------------------------------------------
 
+export const debugApi = {
+  submitBugReport: (payload) => request('POST', '/debug/bug-report', payload),
+};
+
 export const gladiatorApi = {
   /** Check whether the showdown pool is large enough to be active. */
   getStatus: () => request('GET', '/gladiator/status'),
