@@ -342,3 +342,353 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
         'summon_hp_remaining': summon_hp[0] if summon_alive[0] else 0,
         'events': events,
     }
+
+
+# ---------------------------------------------------------------------------
+# Symmetric PvP combat simulation
+# ---------------------------------------------------------------------------
+
+def simulate_pvp_combat(player_a: PlayerStats, items_a: list,
+                        player_b: PlayerStats, items_b: list) -> dict:
+    """
+    Full symmetric PvP combat: both gladiators use all their mechanics
+    (items, summons, spells, crits, dark level, berserker, etc.).
+
+    Event perspective: A = "player", B = "enemy/opponent".
+    New event types added for B's offensive actions:
+      opp_spell         — B casts a spell (damages A)
+      opp_summon_attack — B's summon attacks A directly
+      opp_burn_tick     — B's burn DoT ticks on A
+
+    The existing enemy_attack event is reused for B's direct melee attacks on A
+    (including hitting A's summon shield if alive).
+
+    A's attacks can now hit B's summon first; player_attack events carry
+    opp_summon_dmg / opp_summon_hp / opp_summon_died fields when this happens.
+
+    Returns same shape as simulate_combat() plus enemy_summon_hp_remaining.
+    """
+    rng = random.Random()
+
+    ids_a = {i['id'] if isinstance(i, dict) else i for i in (items_a or [])}
+    ids_b = {i['id'] if isinstance(i, dict) else i for i in (items_b or [])}
+
+    def _flags(ids):
+        return {k: k in ids for k in (
+            'triple_hit', 'crit_125', 'block_reflect', 'block_atk_buff',
+            'lifesteal_spell', 'heal_on_attack', 'atk_execute', 'armor_pen',
+            'berserker', 'crit_freeze', 'crit_lifesteal',
+            'spell_fire', 'spell_frost', 'spell_heal_summon',
+            'summon_upgrade', 'summon_survive',
+        )}
+
+    fa, fb = _flags(ids_a), _flags(ids_b)
+
+    hp_a      = [player_a.current_hp]
+    hp_b      = [player_b.current_hp]
+
+    summon_a  = get_summon_stats(player_a.summon_level)
+    summon_b  = get_summon_stats(player_b.summon_level)
+
+    s_hp_a    = [summon_a['hp'] if summon_a else 0]
+    s_hp_b    = [summon_b['hp'] if summon_b else 0]
+    s_alive_a = [summon_a is not None]
+    s_alive_b = [summon_b is not None]
+
+    hits_a    = [0]
+    hits_b    = [0]
+    consec_a  = [0]
+    consec_b  = [0]
+
+    frost_b   = [0.0]   # B is slowed (A used crit_freeze/spell_frost)
+    frost_a   = [0.0]   # A is slowed (B used crit_freeze/spell_frost)
+    guard_a   = [0.0]   # A has block_atk_buff active until
+    guard_b   = [0.0]   # B has block_atk_buff active until
+
+    events  = []
+    counter = [0]
+    queue   = []
+    SPELL_CD = 4.0
+
+    def push(t, etype, data=None):
+        counter[0] += 1
+        heapq.heappush(queue, (round(t, 4), counter[0], etype, data or {}))
+
+    asp_a = min(ATTACK_SPEED_CAP, player_a.attack_speed)
+    asp_b = min(ATTACK_SPEED_CAP, player_b.attack_speed)
+
+    push(round(1.0 / asp_a, 4), 'a_atk')
+    push(round(1.0 / asp_b, 4), 'b_atk')
+    if player_a.spell_level > 0:
+        push(SPELL_CD, 'a_spell')
+    if player_b.spell_level > 0:
+        push(SPELL_CD, 'b_spell')
+    if summon_a:
+        push(summon_a['speed'], 'a_summon')
+    if summon_b:
+        push(summon_b['speed'], 'b_summon')
+
+    MAX_T = 300.0
+
+    while queue and hp_a[0] > 0 and hp_b[0] > 0:
+        t, _, etype, _data = heapq.heappop(queue)
+        if t > MAX_T:
+            break
+
+        # ── A's direct attack ──────────────────────────────────────────────
+        if etype == 'a_atk':
+            is_berserk  = fa['berserker'] and hp_a[0] < player_a.max_hp * 0.5
+            eff_asp_a   = min(ATTACK_SPEED_CAP, asp_a * (1.20 if is_berserk else 1.0))
+            guard_bonus = 5 if (fa['block_atk_buff'] and t <= guard_a[0]) else 0
+            dmg         = player_a.attack_dmg + guard_bonus
+            is_exec     = fa['atk_execute'] and hp_b[0] < player_b.max_hp * 0.20
+            if is_exec: dmg += 15
+
+            crit = rng.random() < player_a.crit_chance
+            if crit: dmg = int(dmg * (2.25 if fa['crit_125'] else 2.0))
+
+            dm        = get_dark_multiplier(hits_a[0], player_a.dark_level)
+            eff_armor = 0.0 if fa['armor_pen'] else min(0.90, player_b.armor)
+            blocked   = rng.random() < player_b.block_chance
+
+            heal = 0
+            ev = {'time': t, 'type': 'player_attack', 'crit': crit,
+                  'dark_mult': round(dm, 2), 'hit_count': hits_a[0]}
+            if is_exec: ev['execute'] = True
+
+            if blocked:
+                ev['dmg'] = 0
+                ev['blocked_by_opp'] = True
+                if fb['block_reflect']:
+                    raw_r = max(1, int((player_a.attack_dmg + guard_bonus)
+                                      * dm * (1 - min(0.90, player_a.armor))))
+                    hp_a[0] = max(0, hp_a[0] - raw_r)
+                    ev['reflect_dmg'] = raw_r
+                if fb['block_atk_buff']:
+                    guard_b[0] = t + 2.0
+            elif s_alive_b[0]:
+                raw = max(1, int(dmg * dm))
+                if fb['summon_survive']: raw = max(1, int(raw * 0.9))
+                s_hp_b[0] = max(0, s_hp_b[0] - raw)
+                hits_a[0] += 1; consec_a[0] += 1
+                if s_hp_b[0] <= 0: s_alive_b[0] = False
+                ev['dmg'] = raw
+                ev['opp_summon_dmg'] = raw
+                ev['opp_summon_hp']  = s_hp_b[0]
+                if not s_alive_b[0]: ev['opp_summon_died'] = True
+            else:
+                final = max(1, int(dmg * dm * (1 - eff_armor)))
+                hp_b[0] = max(0, hp_b[0] - final)
+                hits_a[0] += 1; consec_a[0] += 1
+
+                if crit and fa['crit_lifesteal']:
+                    base_d  = max(1, int((player_a.attack_dmg + guard_bonus
+                                          + (15 if is_exec else 0))
+                                         * dm * (1 - eff_armor)))
+                    crit_h  = min(final - base_d, player_a.max_hp - hp_a[0])
+                    if crit_h > 0: hp_a[0] += crit_h; heal += crit_h
+                elif player_a.lifesteal > 0:
+                    ls_h = min(round(final * player_a.lifesteal), player_a.max_hp - hp_a[0])
+                    hp_a[0] += ls_h; heal += ls_h
+                if fa['heal_on_attack']:
+                    h3 = min(3, player_a.max_hp - hp_a[0]); hp_a[0] += h3; heal += h3
+
+                ev['dmg']  = final
+                ev['heal'] = heal
+                if crit and fa['crit_freeze'] and hp_b[0] > 0:
+                    frost_b[0] = max(frost_b[0], t + 2.0)
+                if fa['triple_hit'] and consec_a[0] % 3 == 0 and hp_b[0] > 0:
+                    hp_b[0] = max(0, hp_b[0] - 20)
+                    ev['triple_hit'] = True
+
+            ev.setdefault('heal', 0)
+            ev['player_hp'] = hp_a[0]
+            ev['enemy_hp']  = hp_b[0]
+            events.append(ev)
+
+            if hp_b[0] > 0 and hp_a[0] > 0:
+                push(t + round(1.0 / eff_asp_a, 4), 'a_atk')
+
+        # ── B's direct attack ──────────────────────────────────────────────
+        elif etype == 'b_atk':
+            is_berserk  = fb['berserker'] and hp_b[0] < player_b.max_hp * 0.5
+            eff_asp_b   = min(ATTACK_SPEED_CAP, asp_b * (1.20 if is_berserk else 1.0))
+            guard_bonus = 5 if (fb['block_atk_buff'] and t <= guard_b[0]) else 0
+            dmg         = player_b.attack_dmg + guard_bonus
+            is_exec     = fb['atk_execute'] and hp_a[0] < player_a.max_hp * 0.20
+            if is_exec: dmg += 15
+
+            crit = rng.random() < player_b.crit_chance
+            if crit: dmg = int(dmg * (2.25 if fb['crit_125'] else 2.0))
+
+            dm        = get_dark_multiplier(hits_b[0], player_b.dark_level)
+            eff_armor = 0.0 if fb['armor_pen'] else min(0.90, player_a.armor)
+            blocked   = rng.random() < player_a.block_chance
+
+            ev = {'time': t, 'type': 'enemy_attack', 'blocked': blocked,
+                  'dark_mult': round(dm, 3) if player_b.dark_level > 0 else None}
+
+            if blocked:
+                if fa['block_reflect']:
+                    raw_r = max(1, int((player_b.attack_dmg + guard_bonus)
+                                      * dm * (1 - min(0.90, player_b.armor))))
+                    hp_b[0] = max(0, hp_b[0] - raw_r)
+                    ev['thorns'] = raw_r; ev['enemy_hp'] = hp_b[0]
+                if fa['block_atk_buff']:
+                    guard_a[0] = t + 2.0
+                ev['player_hp'] = hp_a[0]
+            elif s_alive_a[0]:
+                raw = max(1, int(dmg * dm))
+                if fa['summon_survive']: raw = max(1, int(raw * 0.9))
+                s_hp_a[0] = max(0, s_hp_a[0] - raw)
+                hits_b[0] += 1; consec_b[0] += 1
+                if s_hp_a[0] <= 0:
+                    s_alive_a[0] = False; ev['summon_died'] = True
+                ev['summon_dmg'] = raw; ev['summon_hp'] = s_hp_a[0]
+                ev['player_hp']  = hp_a[0]
+            else:
+                final = max(1, int(dmg * dm * (1 - eff_armor)))
+                hp_a[0] = max(0, hp_a[0] - final)
+                hits_b[0] += 1; consec_b[0] += 1
+
+                if crit and fb['crit_lifesteal']:
+                    base_d = max(1, int((player_b.attack_dmg + guard_bonus
+                                         + (15 if is_exec else 0))
+                                        * dm * (1 - eff_armor)))
+                    crit_h = min(final - base_d, player_b.max_hp - hp_b[0])
+                    if crit_h > 0: hp_b[0] += crit_h
+                elif player_b.lifesteal > 0:
+                    ls_h = min(round(final * player_b.lifesteal), player_b.max_hp - hp_b[0])
+                    hp_b[0] += ls_h
+                    if ls_h > 0: ev['enemy_lifesteal_heal'] = ls_h; ev['enemy_hp'] = hp_b[0]
+                if fb['heal_on_attack']:
+                    h3 = min(3, player_b.max_hp - hp_b[0]); hp_b[0] += h3
+
+                ev['dmg'] = final; ev['player_hp'] = hp_a[0]
+                if crit and fb['crit_freeze'] and hp_a[0] > 0:
+                    frost_a[0] = max(frost_a[0], t + 2.0)
+                if fb['triple_hit'] and consec_b[0] % 3 == 0 and hp_a[0] > 0:
+                    hp_a[0] = max(0, hp_a[0] - 20); ev['player_hp'] = hp_a[0]
+
+            events.append(ev)
+
+            if hp_a[0] > 0 and hp_b[0] > 0:
+                cd = round(1.0 / eff_asp_b, 4)
+                if frost_a[0] > t: cd = round(cd / 0.7, 4)
+                push(t + cd, 'b_atk')
+
+        # ── A's spell ──────────────────────────────────────────────────────
+        elif etype == 'a_spell':
+            base = 17 + 3 * player_a.spell_level
+            dm   = get_dark_multiplier(hits_a[0], player_a.dark_level)
+            heal = 0
+            if fa['spell_heal_summon'] and s_alive_a[0] and summon_a:
+                sh = int(base / 2)
+                s_hp_a[0] = min(summon_a['hp'], s_hp_a[0] + sh)
+                events.append({'time': t, 'type': 'spell', 'dmg': 0, 'heal': 0,
+                                'dark_mult': 1.0, 'enemy_hp': hp_b[0], 'player_hp': hp_a[0],
+                                'summon_heal': sh, 'summon_hp': s_hp_a[0]})
+                if hp_b[0] > 0: push(t + SPELL_CD, 'a_spell')
+                continue
+            dmg = max(1, int(base * dm))
+            if fa['lifesteal_spell'] and player_a.lifesteal > 0:
+                sh = min(round(dmg * player_a.lifesteal * 0.5), player_a.max_hp - hp_a[0])
+                if sh > 0: hp_a[0] += sh; heal += sh
+            hp_b[0] = max(0, hp_b[0] - dmg)
+            ev = {'time': t, 'type': 'spell', 'dmg': dmg, 'heal': heal,
+                  'dark_mult': round(dm, 2), 'enemy_hp': hp_b[0], 'player_hp': hp_a[0]}
+            if fa['spell_frost'] and hp_b[0] > 0:
+                frost_b[0] = max(frost_b[0], t + 3.0); ev['frost'] = True
+            if fa['spell_fire'] and hp_b[0] > 0:
+                bdmg = max(1, int(base * 0.10))
+                for tick in range(1, 4): push(t + tick, 'a_burn', {'dmg': bdmg})
+                ev['burn_applied'] = True
+            events.append(ev)
+            if hp_b[0] > 0: push(t + SPELL_CD, 'a_spell')
+
+        elif etype == 'a_burn':
+            if hp_b[0] > 0:
+                bdmg = _data.get('dmg', 5)
+                hp_b[0] = max(0, hp_b[0] - bdmg)
+                events.append({'time': t, 'type': 'burn_tick', 'dmg': bdmg, 'enemy_hp': hp_b[0]})
+
+        # ── B's spell ──────────────────────────────────────────────────────
+        elif etype == 'b_spell':
+            base = 17 + 3 * player_b.spell_level
+            dm   = get_dark_multiplier(hits_b[0], player_b.dark_level)
+            heal = 0
+            if fb['spell_heal_summon'] and s_alive_b[0] and summon_b:
+                sh = int(base / 2)
+                s_hp_b[0] = min(summon_b['hp'], s_hp_b[0] + sh)
+                events.append({'time': t, 'type': 'opp_spell', 'dmg': 0, 'heal': 0,
+                                'dark_mult': 1.0, 'enemy_hp': hp_b[0], 'player_hp': hp_a[0],
+                                'opp_summon_heal': sh, 'opp_summon_hp': s_hp_b[0]})
+                if hp_a[0] > 0: push(t + SPELL_CD, 'b_spell')
+                continue
+            dmg = max(1, int(base * dm))
+            if fb['lifesteal_spell'] and player_b.lifesteal > 0:
+                sh = min(round(dmg * player_b.lifesteal * 0.5), player_b.max_hp - hp_b[0])
+                if sh > 0: hp_b[0] += sh; heal += sh
+            hp_a[0] = max(0, hp_a[0] - dmg)
+            ev = {'time': t, 'type': 'opp_spell', 'dmg': dmg, 'heal': heal,
+                  'dark_mult': round(dm, 2), 'enemy_hp': hp_b[0], 'player_hp': hp_a[0]}
+            if fb['spell_frost'] and hp_a[0] > 0:
+                frost_a[0] = max(frost_a[0], t + 3.0); ev['frost'] = True
+            if fb['spell_fire'] and hp_a[0] > 0:
+                bdmg = max(1, int(base * 0.10))
+                for tick in range(1, 4): push(t + tick, 'b_burn', {'dmg': bdmg})
+                ev['burn_applied'] = True
+            events.append(ev)
+            if hp_a[0] > 0: push(t + SPELL_CD, 'b_spell')
+
+        elif etype == 'b_burn':
+            if hp_a[0] > 0:
+                bdmg = _data.get('dmg', 5)
+                hp_a[0] = max(0, hp_a[0] - bdmg)
+                events.append({'time': t, 'type': 'opp_burn_tick', 'dmg': bdmg, 'player_hp': hp_a[0]})
+
+        # ── A's summon attacks B directly ──────────────────────────────────
+        elif etype == 'a_summon':
+            if s_alive_a[0] and summon_a:
+                dmg = max(1, int(summon_a['attack']
+                                 * get_dark_multiplier(hits_a[0], player_a.dark_level)))
+                hp_b[0] = max(0, hp_b[0] - dmg)
+                ev = {'time': t, 'type': 'summon_attack', 'dmg': dmg,
+                      'dark_mult': round(get_dark_multiplier(hits_a[0], player_a.dark_level), 2),
+                      'enemy_hp': hp_b[0]}
+                if fa['summon_upgrade']:
+                    sh = min(int(dmg * 0.10), summon_a['hp'] - s_hp_a[0])
+                    if sh > 0: s_hp_a[0] += sh; ev['summon_heal'] = sh; ev['summon_hp'] = s_hp_a[0]
+                events.append(ev)
+                if hp_b[0] > 0: push(t + summon_a['speed'], 'a_summon')
+
+        # ── B's summon attacks A directly ──────────────────────────────────
+        elif etype == 'b_summon':
+            if s_alive_b[0] and summon_b:
+                dmg = max(1, int(summon_b['attack']
+                                 * get_dark_multiplier(hits_b[0], player_b.dark_level)))
+                hp_a[0] = max(0, hp_a[0] - dmg)
+                ev = {'time': t, 'type': 'opp_summon_attack', 'dmg': dmg,
+                      'dark_mult': round(get_dark_multiplier(hits_b[0], player_b.dark_level), 2),
+                      'player_hp': hp_a[0]}
+                if fb['summon_upgrade']:
+                    sh = min(int(dmg * 0.10), summon_b['hp'] - s_hp_b[0])
+                    if sh > 0: s_hp_b[0] += sh; ev['opp_summon_heal'] = sh; ev['opp_summon_hp'] = s_hp_b[0]
+                events.append(ev)
+                if hp_a[0] > 0: push(t + summon_b['speed'], 'b_summon')
+
+    result = 'win' if hp_b[0] <= 0 else 'lose'
+    events.append({
+        'time':      events[-1]['time'] if events else 0,
+        'type':      'combat_end',
+        'result':    result,
+        'player_hp': hp_a[0],
+        'enemy_hp':  hp_b[0],
+    })
+    return {
+        'result':                    result,
+        'player_hp_remaining':       hp_a[0],
+        'summon_hp_remaining':       s_hp_a[0] if s_alive_a[0] else 0,
+        'enemy_summon_hp_remaining': s_hp_b[0] if s_alive_b[0] else 0,
+        'events':                    events,
+    }

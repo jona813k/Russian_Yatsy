@@ -139,7 +139,11 @@ def get_opponents_for_tier(tier: int, exclude_run_id: str,
             (tier, exclude_run_id),
         ).fetchall()
 
-    pool = [dict(r) for r in rows]
+    # Only characters who had the gladiator key are eligible opponents
+    pool = [
+        dict(r) for r in rows
+        if json.loads(r['stats_json']).get('has_gladiator_key', False)
+    ]
     if not pool:
         return []
 

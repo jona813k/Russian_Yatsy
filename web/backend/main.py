@@ -39,7 +39,7 @@ from web.backend.gladiator_db import (
     get_opponents_for_tier, get_leaderboard, get_all_characters, player_stats_to_enemy,
     completed_character_count,
 )
-from web.backend.combat import simulate_combat
+from web.backend.combat import simulate_combat, simulate_pvp_combat
 
 # ---------------------------------------------------------------------------
 # Run history — persisted to JSON so it survives server restarts
@@ -621,6 +621,10 @@ def _build_gauntlet_response(g: dict, combat: dict | None = None) -> dict:
             'name':  opp['name'],
             'stats': _safe_stats(opp),
         }
+    all_opps = [
+        {'name': o['name'], 'stats': _safe_stats(o)}
+        for o in g['opponents']
+    ] if g.get('opponents') else []
     resp = {
         'gauntlet_id':    g['gauntlet_id'],
         'player_name':    g['player_name'],
@@ -630,6 +634,7 @@ def _build_gauntlet_response(g: dict, combat: dict | None = None) -> dict:
         'status':         g['status'],
         'final_wins':     g['final_wins'],
         'next_opponent':  next_opp,
+        'opponents':      all_opps,
     }
     if combat is not None:
         resp['combat'] = combat
@@ -639,7 +644,13 @@ def _build_gauntlet_response(g: dict, combat: dict | None = None) -> dict:
 def _safe_stats(char: dict) -> dict:
     """Return a summary of the opponent's key stats for display."""
     import json as _json
+    from web.backend.data import SUMMON_TIERS
     stats = _json.loads(char['stats_json'])
+    sl = stats.get('summon_level', 0)
+    summon = None
+    for tier in SUMMON_TIERS:
+        if sl >= tier['min_level']:
+            summon = {'name': tier['name'], 'hp': tier['hp']}
     return {
         'max_hp':       stats.get('max_hp', 0),
         'attack_dmg':   stats.get('attack_dmg', 0),
@@ -650,6 +661,7 @@ def _safe_stats(char: dict) -> dict:
         'dark_level':   stats.get('dark_level', 0),
         'summon_level': stats.get('summon_level', 0),
         'spell_level':  stats.get('spell_level', 0),
+        'summon':       summon,
     }
 
 
@@ -725,6 +737,81 @@ def gladiator_enter(run_id: str):
     return _build_gauntlet_response(g)
 
 
+@app.post("/api/gladiator/{gauntlet_id}/fight_tier")
+def gladiator_fight_tier(gauntlet_id: str):
+    """
+    Simulate all 3 fights in the current tier simultaneously.
+    Returns an array of fight results (each with events) for parallel animation.
+    """
+    g = gauntlet_sessions.get(gauntlet_id)
+    if g is None:
+        raise HTTPException(status_code=404, detail='Gauntlet session not found')
+    if g['status'] != 'active':
+        raise HTTPException(status_code=400, detail='Gauntlet already complete')
+
+    import json as _json
+    from .player import PlayerStats
+
+    raw = g['player_stats']
+    fights = []
+
+    for i in range(3):
+        player = PlayerStats(**{k: v for k, v in raw.items() if hasattr(PlayerStats, k)})
+        player.current_hp = player.max_hp
+
+        opponent  = g['opponents'][i]
+        opp_stats = _json.loads(opponent['stats_json'])
+        opp_items = _json.loads(opponent['items_json'])
+        opp_player = PlayerStats(**{k: v for k, v in opp_stats.items() if hasattr(PlayerStats, k)})
+        opp_player.current_hp = opp_player.max_hp
+
+        combat = simulate_pvp_combat(player, g['player_items'], opp_player, opp_items)
+        fights.append({
+            'combat':         combat,
+            'result':         combat['result'],
+            'opponent_name':  opponent['name'],
+            'opponent_stats': _safe_stats(opponent),
+        })
+
+    wins      = sum(1 for f in fights if f['result'] == 'win')
+    advancing = wins >= 2
+    eliminated = not advancing
+
+    g['wins_in_tier']  = wins
+    g['fight_in_tier'] = 3
+
+    if advancing:
+        g['current_wins'] += 1
+        new_tier = g['current_wins']
+        new_opponents = get_opponents_for_tier(
+            tier=new_tier,
+            exclude_run_id=g['run_id'],
+            already_used_ids=g['used_opponent_ids'],
+        )
+        if not new_opponents:
+            g['status'] = 'complete'
+            g['final_wins'] = g['current_wins']
+            update_wins(g['character_db_id'], g['final_wins'])
+        else:
+            g['opponents']         = new_opponents
+            g['used_opponent_ids'] += [o['id'] for o in new_opponents]
+            g['fight_in_tier']     = 0
+            g['wins_in_tier']      = 0
+    else:
+        g['status']      = 'complete'
+        g['final_wins']  = g['current_wins']
+        update_wins(g['character_db_id'], g['final_wins'])
+
+    gauntlet = _build_gauntlet_response(g)
+    return {
+        'fights':    fights,
+        'tier_wins': wins,
+        'advancing': advancing,
+        'eliminated': eliminated,
+        'gauntlet':  gauntlet,
+    }
+
+
 @app.post("/api/gladiator/{gauntlet_id}/fight")
 def gladiator_fight(gauntlet_id: str, body: GladiatorFightRequest = None):
     """
@@ -747,11 +834,13 @@ def gladiator_fight(gauntlet_id: str, body: GladiatorFightRequest = None):
     player = PlayerStats(**{k: v for k, v in raw.items() if hasattr(PlayerStats, k)})
     player.current_hp = player.max_hp   # full HP each fight
 
-    opponent = g['opponents'][g['fight_in_tier']]
-    opp_stats = _json.loads(opponent['stats_json'])
-    enemy_dict = player_stats_to_enemy(opp_stats, opponent['name'])
+    opponent   = g['opponents'][g['fight_in_tier']]
+    opp_stats  = _json.loads(opponent['stats_json'])
+    opp_items  = _json.loads(opponent['items_json'])
+    opp_player = PlayerStats(**{k: v for k, v in opp_stats.items() if hasattr(PlayerStats, k)})
+    opp_player.current_hp = opp_player.max_hp   # full HP each fight
 
-    combat = simulate_combat(player, enemy_dict, g['player_items'])
+    combat = simulate_pvp_combat(player, g['player_items'], opp_player, opp_items)
     if body and body.skip:
         combat['events'] = []   # strip events so frontend skips animation
 

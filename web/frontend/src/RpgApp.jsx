@@ -75,6 +75,7 @@ export default function RpgApp({ onBack }) {
     return (
       <GladiatorScreen
         gauntlet={gauntlet}
+        playerStats={run?.player}
         runId={runId}
         onUpdate={setGauntlet}
         onFinish={() => { setGauntlet(null); setRun(null); setRunId(null); }}

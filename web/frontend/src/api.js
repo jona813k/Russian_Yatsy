@@ -123,4 +123,8 @@ export const gladiatorApi = {
   /** Simulate the next fight in a gauntlet session. */
   fight: (gauntletId, skip = false) =>
     request('POST', `/gladiator/${gauntletId}/fight`, { skip }),
+
+  /** Simulate all 3 tier fights at once and return all event streams. */
+  fightTier: (gauntletId) =>
+    request('POST', `/gladiator/${gauntletId}/fight_tier`),
 };

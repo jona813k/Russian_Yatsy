@@ -2,6 +2,184 @@ import { useState } from 'react';
 import { C } from '../../theme.js';
 import { Btn } from '../ui/Btn.jsx';
 
+// ── Rules modal ──────────────────────────────────────────────────────────────
+const SECTIONS = [
+  {
+    key: 'overview',
+    label: 'Overview',
+    content: [
+      { head: 'The Run', body: 'Each run consists of three levels. Every level has three fights — the last of which is a boss. Defeat all three levels to complete your run and unlock the Gladiator Showdown.' },
+      { head: 'Between fights', body: 'After each fight you roll dice to score points and upgrade your gladiator. After the third fight of each level you visit the Shop and the Forge before moving on.' },
+      { head: 'Gladiator Showdown', body: 'After completing a run you can enter the arena and fight real characters left by other players. Win 2 out of 3 fights per tier to advance. Tiers expand as stronger gladiators conquer them.' },
+    ],
+  },
+  {
+    key: 'dice',
+    label: 'Dice & Scoring',
+    content: [
+      { head: 'Your dice', body: 'You start with five standard d6s. You have up to two re-rolls per turn — lock the dice you want to keep, then re-roll the rest.' },
+      { head: 'Scoring categories', body: 'Categories mirror classic Yatzy: Ones–Sixes (sum of that face), Three/Four of a Kind (sum of all dice), Full House (25 pts), Small Straight (30 pts), Large Straight (40 pts), Chance (sum of all), and Yatzy (50 pts). Upper section bonus: 35 pts if Ones–Sixes sum ≥ 63.' },
+      { head: 'Special dice', body: 'Unlock extra dice through upgrades: d12 (rolls 1–12), d3 (rolls 1–3), Risky Die (0 or 12), Bomb Die (explodes for bonus damage in combat), Mirror Die (copies another die), Logic Die (remembers a face), 2/5 Die (always 2 or 5), and more.' },
+    ],
+  },
+  {
+    key: 'upgrades',
+    label: 'Upgrades',
+    content: [
+      { head: 'Upgrade phase', body: 'After each fight you are presented with two upgrade choices — pick one. Each upgrade improves one of your gladiator\'s stats. You also earn gold which can be spent at the Shop.' },
+      { head: 'Stats you can improve', body: 'Max HP · Attack Damage · Attack Speed · Crit Chance · Armor · Block Chance · Lifesteal · Dark Level · Summon Level · Spell Level' },
+      { head: 'Dark Level', body: 'As you land more hits in a fight, your damage multiplier ramps up. Higher dark level makes the ramp steeper and the peak multiplier higher — big reward for sustained combat.' },
+      { head: 'Summon', body: 'High enough Summon Level spawns a creature that fights alongside you: Imp (lvl 1) → Wolf (6) → Orc (12) → Skeleton (18) → Dragon (24). The summon absorbs hits before they reach you.' },
+      { head: 'Spells', body: 'Spell Level unlocks and powers up a spell cast automatically every 4 seconds. Higher level = more spell damage.' },
+    ],
+  },
+  {
+    key: 'combat',
+    label: 'Combat',
+    content: [
+      { head: 'Auto-battle', body: 'Combat is fully automatic. Your gladiator attacks, casts spells, and your summon strikes — all based on their stats. Watch the Battle Chronicle for a live log of every hit.' },
+      { head: 'Attack order', body: 'Both fighters attack simultaneously on their own timers (1 ÷ Attack Speed seconds per swing). Higher Attack Speed = more swings per second.' },
+      { head: 'Damage formula', body: 'Each hit: Attack Damage × Dark Multiplier, then reduced by the target\'s Armor %. A critical hit doubles the damage (some items change the multiplier). Blocked hits deal no damage.' },
+      { head: 'Summon targeting', body: 'Enemy attacks hit your summon first. Once the summon falls, attacks reach you directly. Same applies to the enemy.' },
+      { head: 'Victory', body: 'Reduce the enemy to 0 HP. If the timer expires, the fighter with more HP remaining wins.' },
+    ],
+  },
+  {
+    key: 'items',
+    label: 'Items',
+    content: [
+      { head: 'Shop items', body: 'Bought between levels. Each item grants a permanent passive effect for the rest of the run.' },
+      { head: 'Forge', body: 'The Forge lets you reroll your upgrade choices or swap out a specific upgrade. Use it to fine-tune your build after each level.' },
+      { head: 'Notable items', body: 'Lifesteal +5% · Armor Pen (ignore enemy armor) · Berserker (+20% attack speed below 50% HP) · Crit Freeze (slow enemy on crit) · Block Reflect (bounce blocked damage back) · Spell Fire (spells leave a burn DoT) · HP→ATK (5% of max HP added as attack damage)' },
+    ],
+  },
+];
+
+function RulesModal({ onClose }) {
+  const [tab, setTab] = useState('overview');
+  const section = SECTIONS.find(s => s.key === tab);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.75)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(180deg, #1E1208 0%, #0F0A04 100%)',
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          width: '100%',
+          maxWidth: 600,
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.9)',
+          fontFamily: "'Cinzel', serif",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px 12px',
+          borderBottom: `1px solid ${C.borderDim}`,
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: C.muted, textTransform: 'uppercase', marginBottom: 2 }}>
+              Gladiator Codex
+            </div>
+            <div style={{ fontSize: 18, color: C.gold, letterSpacing: 2, fontFamily: "'Cinzel Decorative', serif" }}>
+              How to Play
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none', color: C.muted,
+              fontSize: 18, cursor: 'pointer', padding: '4px 8px',
+              fontFamily: "'Cinzel', serif",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          display: 'flex', gap: 0,
+          borderBottom: `1px solid ${C.borderDim}`,
+          flexShrink: 0,
+          overflowX: 'auto',
+        }}>
+          {SECTIONS.map(s => (
+            <button
+              key={s.key}
+              onClick={() => setTab(s.key)}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: tab === s.key ? `2px solid ${C.gold}` : '2px solid transparent',
+                color: tab === s.key ? C.gold : C.muted,
+                padding: '10px 16px',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontFamily: "'Cinzel', serif",
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.15s',
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ overflowY: 'auto', padding: '20px 24px 24px', flex: 1 }}>
+          {section.content.map((item, i) => (
+            <div key={i} style={{ marginBottom: i < section.content.length - 1 ? 20 : 0 }}>
+              <div style={{
+                fontSize: 12, color: C.bronze, letterSpacing: 1.5,
+                textTransform: 'uppercase', marginBottom: 6,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ color: C.gold, opacity: 0.5 }}>—</span>
+                {item.head}
+              </div>
+              <div style={{
+                fontSize: 12.5, color: C.text, lineHeight: 1.75,
+                opacity: 0.85,
+              }}>
+                {item.body}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '12px 20px',
+          borderTop: `1px solid ${C.borderDim}`,
+          textAlign: 'center',
+          flexShrink: 0,
+        }}>
+          <Btn onClick={onClose} color={C.stone} style={{ fontSize: 11, padding: '7px 24px' }}>
+            Close
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Colosseum arch SVG decoration
 function ColossumArch({ style }) {
   return (
@@ -51,6 +229,7 @@ function ColossumArch({ style }) {
 
 export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
   const [name, setName] = useState('');
+  const [showRules, setShowRules] = useState(false);
 
   return (
     <div style={{
@@ -204,6 +383,9 @@ export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
           <Btn onClick={() => onStart(name.trim() || 'Anonymous')} disabled={loading} color={C.crimson} style={{ fontSize: 13, padding: '10px 28px', letterSpacing: 2 }}>
             {loading ? 'Entering Arena…' : 'Enter the Arena'}
           </Btn>
+          <Btn onClick={() => setShowRules(true)} color={C.stone} style={{ fontSize: 12, padding: '10px 18px' }}>
+            How to Play
+          </Btn>
           <Btn onClick={onHistory} color={C.stone} style={{ fontSize: 12, padding: '10px 18px' }}>
             History
           </Btn>
@@ -214,6 +396,8 @@ export function StartScreen({ onStart, onHistory, onBack, loading, error }) {
           )}
         </div>
       </div>
+
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
       {/* Sand floor */}
       <div style={{
