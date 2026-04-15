@@ -307,9 +307,9 @@ function FightPanel({ fight, playerStats, playerName, onDone }) {
     }}>
       {/* Arena row */}
       <div style={{
-        position: 'relative', height: 170,
+        position: 'relative', height: 150,
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        padding: '8px 12px 8px', gap: 16,
+        padding: '6px 12px 6px', gap: 12,
       }}>
         <ArenaBackground />
 
@@ -338,8 +338,8 @@ function FightPanel({ fight, playerStats, playerName, onDone }) {
 
         {/* Player side */}
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 6 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <PlayerSprite anim={playerAnim} size={100} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <PlayerSprite anim={playerAnim} size={80} />
             <MiniCard
               label="You" name={playerName}
               hp={playerHp} maxHp={playerMax}
@@ -357,8 +357,8 @@ function FightPanel({ fight, playerStats, playerName, onDone }) {
             )}
           </div>
           {playerSummon && summonAlive && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <SummonSprite name={playerSummon.name} anim={summonAnim} size={78} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <SummonSprite name={playerSummon.name} anim={summonAnim} size={60} />
               <MiniCard
                 label="Summon" name={playerSummon.name}
                 hp={summonHp} maxHp={playerSummon.hp}
@@ -381,9 +381,9 @@ function FightPanel({ fight, playerStats, playerName, onDone }) {
 
         {/* Opponent side (mirrored) */}
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 6, flexDirection: 'row-reverse' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <div style={{ transform: 'scaleX(-1)' }}>
-              <PlayerSprite anim={enemyAnim} size={100} />
+              <PlayerSprite anim={enemyAnim} size={80} />
             </div>
             <MiniCard
               label="Gladiator" name={fight?.opponent_name ?? '???'}
@@ -402,9 +402,9 @@ function FightPanel({ fight, playerStats, playerName, onDone }) {
             )}
           </div>
           {oppSummon && oppSummonAlive && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{ transform: 'scaleX(-1)' }}>
-                <SummonSprite name={oppSummon.name} anim={oppSummonAnim} size={78} />
+                <SummonSprite name={oppSummon.name} anim={oppSummonAnim} size={60} />
               </div>
               <MiniCard
                 label="Summon" name={oppSummon.name}
@@ -552,6 +552,25 @@ export function GladiatorScreen({ gauntlet: initialGauntlet, playerStats, onUpda
                 <Btn onClick={onFinish} color={C.stone} style={{ fontSize: 12 }}>New Run</Btn>
               </div>
             </>
+          ) : g.status === 'complete' ? (
+            <>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>👑</div>
+              <div style={{ color: C.gold, fontSize: 18, fontFamily: "'Cinzel Decorative', serif", letterSpacing: 2, marginBottom: 8 }}>
+                Undefeated!
+              </div>
+              <div style={{ color: C.textDim, fontSize: 13, marginBottom: 4 }}>
+                {playerName} won{' '}
+                <span style={{ color: C.gold, fontWeight: '700' }}>{wins}/3</span>{' '}
+                fights this final tier
+              </div>
+              <div style={{ color: C.muted, fontSize: 11, marginBottom: 20 }}>
+                No challengers remain. {playerName} stands alone.
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Btn onClick={loadLeaderboard} color={C.gold} style={{ fontSize: 12, color: C.dark }}>Leaderboard</Btn>
+                <Btn onClick={onFinish} color={C.stone} style={{ fontSize: 12 }}>New Run</Btn>
+              </div>
+            </>
           ) : (
             <>
               <div style={{ fontSize: 28, marginBottom: 10 }}>🏆</div>
@@ -599,8 +618,8 @@ export function GladiatorScreen({ gauntlet: initialGauntlet, playerStats, onUpda
     );
   }
 
-  // ── Complete (no opponents at next tier) ──────────────────────────────────
-  if (g.status === 'complete' && phase !== 'tier_result') {
+  // ── Complete (no opponents at next tier) — only show after animations done ─
+  if (g.status === 'complete' && phase !== 'tier_result' && phase !== 'animating') {
     return (
       <div style={overlayStyle}>
         <div style={cardStyle}>

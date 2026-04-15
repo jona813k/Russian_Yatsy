@@ -145,6 +145,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
             if crit:
                 dmg = int(dmg * crit_mult)
 
+            pre_dark_dmg = dmg  # post-crit, pre-dark, pre-armor — lifesteal base
             dark_mult = get_dark_multiplier(hit_count[0], player.dark_level)
             dmg = max(1, int(dmg * dark_mult * (1 - eff_enemy_armor)))
             hit_count[0] += 1
@@ -152,15 +153,14 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
 
             heal = 0
             if crit and has_crit_lifesteal:
-                base_dmg = max(1, int((eff_dmg + guard_bonus + (15 if is_execute else 0))
-                                      * dark_mult * (1 - eff_enemy_armor)))
-                crit_bonus = dmg - base_dmg
+                base_pre_dark = eff_dmg + guard_bonus + (15 if is_execute else 0)
+                crit_bonus = pre_dark_dmg - base_pre_dark
                 crit_ls_heal = min(crit_bonus, player.max_hp - player_hp[0])
                 if crit_ls_heal > 0:
                     player_hp[0] += crit_ls_heal
                     heal += crit_ls_heal
             elif player.lifesteal > 0:
-                ls_heal = min(round(dmg * player.lifesteal), player.max_hp - player_hp[0])
+                ls_heal = min(round(pre_dark_dmg * player.lifesteal), player.max_hp - player_hp[0])
                 player_hp[0] += ls_heal
                 heal += ls_heal
             if has_heal_on_attack:
@@ -218,7 +218,7 @@ def simulate_combat(player: PlayerStats, enemy: dict, owned_items: list,
 
             dmg = max(1, int(base_spell_dmg * dark_mult))
             if has_lifesteal_spell and player.lifesteal > 0:
-                siphon_heal = min(round(dmg * player.lifesteal * 0.5), player.max_hp - player_hp[0])
+                siphon_heal = min(round(base_spell_dmg * player.lifesteal * 0.5), player.max_hp - player_hp[0])
                 if siphon_heal > 0:
                     player_hp[0] += siphon_heal
                     heal += siphon_heal
@@ -477,18 +477,17 @@ def simulate_pvp_combat(player_a: PlayerStats, items_a: list,
                 ev['opp_summon_hp']  = s_hp_b[0]
                 if not s_alive_b[0]: ev['opp_summon_died'] = True
             else:
+                pre_dark_a = dmg  # post-crit, pre-dark, pre-armor — lifesteal base
                 final = max(1, int(dmg * dm * (1 - eff_armor)))
                 hp_b[0] = max(0, hp_b[0] - final)
                 hits_a[0] += 1; consec_a[0] += 1
 
                 if crit and fa['crit_lifesteal']:
-                    base_d  = max(1, int((player_a.attack_dmg + guard_bonus
-                                          + (15 if is_exec else 0))
-                                         * dm * (1 - eff_armor)))
-                    crit_h  = min(final - base_d, player_a.max_hp - hp_a[0])
+                    base_pre_dark_a = player_a.attack_dmg + guard_bonus + (15 if is_exec else 0)
+                    crit_h = min(pre_dark_a - base_pre_dark_a, player_a.max_hp - hp_a[0])
                     if crit_h > 0: hp_a[0] += crit_h; heal += crit_h
                 elif player_a.lifesteal > 0:
-                    ls_h = min(round(final * player_a.lifesteal), player_a.max_hp - hp_a[0])
+                    ls_h = min(round(pre_dark_a * player_a.lifesteal), player_a.max_hp - hp_a[0])
                     hp_a[0] += ls_h; heal += ls_h
                 if fa['heal_on_attack']:
                     h3 = min(3, player_a.max_hp - hp_a[0]); hp_a[0] += h3; heal += h3
@@ -547,18 +546,17 @@ def simulate_pvp_combat(player_a: PlayerStats, items_a: list,
                 ev['summon_dmg'] = raw; ev['summon_hp'] = s_hp_a[0]
                 ev['player_hp']  = hp_a[0]
             else:
+                pre_dark_b = dmg  # post-crit, pre-dark, pre-armor — lifesteal base
                 final = max(1, int(dmg * dm * (1 - eff_armor)))
                 hp_a[0] = max(0, hp_a[0] - final)
                 hits_b[0] += 1; consec_b[0] += 1
 
                 if crit and fb['crit_lifesteal']:
-                    base_d = max(1, int((player_b.attack_dmg + guard_bonus
-                                         + (15 if is_exec else 0))
-                                        * dm * (1 - eff_armor)))
-                    crit_h = min(final - base_d, player_b.max_hp - hp_b[0])
+                    base_pre_dark_b = player_b.attack_dmg + guard_bonus + (15 if is_exec else 0)
+                    crit_h = min(pre_dark_b - base_pre_dark_b, player_b.max_hp - hp_b[0])
                     if crit_h > 0: hp_b[0] += crit_h
                 elif player_b.lifesteal > 0:
-                    ls_h = min(round(final * player_b.lifesteal), player_b.max_hp - hp_b[0])
+                    ls_h = min(round(pre_dark_b * player_b.lifesteal), player_b.max_hp - hp_b[0])
                     hp_b[0] += ls_h
                     if ls_h > 0: ev['enemy_lifesteal_heal'] = ls_h; ev['enemy_hp'] = hp_b[0]
                 if fb['heal_on_attack']:
@@ -592,7 +590,7 @@ def simulate_pvp_combat(player_a: PlayerStats, items_a: list,
                 continue
             dmg = max(1, int(base * dm))
             if fa['lifesteal_spell'] and player_a.lifesteal > 0:
-                sh = min(round(dmg * player_a.lifesteal * 0.5), player_a.max_hp - hp_a[0])
+                sh = min(round(base * player_a.lifesteal * 0.5), player_a.max_hp - hp_a[0])
                 if sh > 0: hp_a[0] += sh; heal += sh
             hp_b[0] = max(0, hp_b[0] - dmg)
             ev = {'time': t, 'type': 'spell', 'dmg': dmg, 'heal': heal,
@@ -627,7 +625,7 @@ def simulate_pvp_combat(player_a: PlayerStats, items_a: list,
                 continue
             dmg = max(1, int(base * dm))
             if fb['lifesteal_spell'] and player_b.lifesteal > 0:
-                sh = min(round(dmg * player_b.lifesteal * 0.5), player_b.max_hp - hp_b[0])
+                sh = min(round(base * player_b.lifesteal * 0.5), player_b.max_hp - hp_b[0])
                 if sh > 0: hp_b[0] += sh; heal += sh
             hp_a[0] = max(0, hp_a[0] - dmg)
             ev = {'time': t, 'type': 'opp_spell', 'dmg': dmg, 'heal': heal,

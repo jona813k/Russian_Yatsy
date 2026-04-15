@@ -117,11 +117,11 @@ export function PlayerPanel({ player, ownedItems }) {
           {ownedItems.map(item => (
             <div key={item.id} style={{
               fontSize: 11,
-              color: C.green,
+              color: item.id === 'gladiator_key' ? '#C084FC' : C.green,
               fontFamily: "'Cinzel', serif",
               padding: '1px 0',
             }}>
-              ⚔ {item.name}
+              {item.id === 'gladiator_key' ? '🗝 ' : '⚔ '}{item.name}
             </div>
           ))}
         </div>
